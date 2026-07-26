@@ -692,14 +692,16 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       <button class="btn btn-s btn-sm btn-ic" id="navAdelante" title="Adelante">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
-      <button class="btn btn-s btn-sm btn-ic" id="navSubir" title="Subir un nivel">
+      <button class="btn btn-s btn-sm" id="navSubir" title="Ir a la carpeta que la contiene">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
-      <button class="btn btn-s btn-sm btn-ic" id="navInicio" title="Ir al inicio">
+          <path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        Subir</button>
+      <button class="btn btn-s btn-sm" id="navInicio" title="Volver a la carpeta raíz">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+          <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>
+        Inicio</button>
       <div id="repoMigas" class="repo-migas"></div>
     </div>
 
@@ -3237,13 +3239,14 @@ const DEFAULT_GRAPH_CFG = {
   library  : 'Solicitudes',
 };
 
-/* Carpeta destino según el formato: evita que todo caiga en la raíz */
+/* Carpeta destino según el formato: evita que todo caiga en la raíz.
+   La Carta Responsiva no lleva carpeta propia: forma parte de la
+   solicitud a la que acompaña, no es un expediente independiente. */
 const CARPETAS = {
   capacitacion : 'Capacitacion',
   licencia     : 'Licencia',
   viaticos     : 'Viaticos',
   vuelo        : 'Vuelo y Hospedaje',
-  responsiva   : 'Carta Responsiva',
 };
 
 let _msalApp = null;
