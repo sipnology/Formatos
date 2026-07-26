@@ -438,6 +438,32 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 /* Tarjeta de herramienta en el inicio */
 .card.tool{--cc:#E5471C;--cc-bg:#FDECE7}
 
+/* ══════════════ NAVEGADOR DEL REPOSITORIO ══════════════ */
+.repo-nav{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:nowrap}
+.repo-migas{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;font-size:12.5px;
+  padding:2px 4px;line-height:1.7}
+.repo-migas::-webkit-scrollbar{height:5px}
+.repo-lista{max-height:min(50vh,420px);overflow-y:auto;border:1px solid var(--line);
+  border-radius:10px;background:var(--card)}
+.repo-fila{display:flex;align-items:center;gap:11px;padding:9px 12px;
+  border-bottom:1px solid var(--line-2);transition:background .12s}
+.repo-fila:last-child{border-bottom:none}
+.repo-fila[data-entrar]{cursor:pointer}
+.repo-fila:hover{background:var(--bg)}
+.repo-ic{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;
+  align-items:center;justify-content:center}
+.repo-ic svg{width:15px;height:15px}
+.repo-ic.carp{background:#FEF6E7;color:#C88A16}
+.repo-ic.arch{background:var(--or-soft);color:var(--or)}
+.repo-tx{flex:1;min-width:0}
+.repo-n{font-size:13px;font-weight:570;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.repo-m{font-size:11.5px;color:var(--ink-3);margin-top:1px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.repo-go{font-size:11.5px;color:var(--ink-3);flex-shrink:0}
+.repo-fila:hover .repo-go{color:var(--or)}
+.repo-vacio{padding:22px 14px;text-align:center;font-size:12.5px;color:var(--ink-3)}
+
 </style>
 </head>
 <body>
@@ -656,11 +682,39 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 
 <!-- ══════════════ REPOSITORIO ══════════════ -->
 <div class="ov" id="ovRepo">
-  <div class="modal" style="max-width:560px">
-    <h3>Solicitudes en el repositorio</h3>
-    <p>Guardadas en SharePoint. Selecciona una para abrirla en el portal.</p>
-    <div id="repoLista" style="max-height:360px;overflow-y:auto;margin-bottom:18px"></div>
-    <div class="modal-a"><button class="btn btn-s" data-cerrar="ovRepo">Cerrar</button></div>
+  <div class="modal" style="max-width:min(740px,94vw)">
+    <h3>Repositorio de solicitudes</h3>
+    <p>Guardadas en SharePoint. Recorre las carpetas o busca por nombre.</p>
+
+    <div class="fld" style="margin-bottom:11px">
+      <input type="text" id="repoBuscar" placeholder="Buscar por nombre en todo el repositorio…"
+             autocomplete="off">
+    </div>
+
+    <div class="repo-nav">
+      <button class="btn btn-s btn-sm btn-ic" id="navAtras" title="Atrás">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="btn btn-s btn-sm btn-ic" id="navAdelante" title="Adelante">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      <button class="btn btn-s btn-sm btn-ic" id="navSubir" title="Subir un nivel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      <button class="btn btn-s btn-sm btn-ic" id="navInicio" title="Ir al inicio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+      <div id="repoMigas" class="repo-migas"></div>
+    </div>
+
+    <div id="repoLista" class="repo-lista"></div>
+
+    <div class="modal-a" style="justify-content:space-between;align-items:center;margin-top:13px">
+      <span class="hint" id="repoCuenta"></span>
+      <button class="btn btn-s" data-cerrar="ovRepo">Cerrar</button>
+    </div>
   </div>
 </div>
 
@@ -3292,7 +3346,12 @@ async function repoGuardar(){
   }
 }
 
-/* ── Abrir una solicitud guardada ── */
+/* ═══════════════════════ NAVEGADOR DEL REPOSITORIO ═══════════════════════
+   Recorre carpetas con historial (atrás / adelante), subir un nivel, inicio,
+   ruta de migas y búsqueda en todo el repositorio.                        */
+
+const NAV = { drive:null, H:null, pila:[], hist:[], hp:0, raiz:'Solicitudes' };
+
 async function repoAbrir(){
   const cfg = getGraphCfg();
   if(location.protocol === 'file:'){
@@ -3300,68 +3359,180 @@ async function repoAbrir(){
     return;
   }
   try{
-    toast('Consultando el repositorio…','inf',2000);
+    toast('Conectando con el repositorio…','inf',1800);
     const token = await graphToken(cfg);
-    const H = {Authorization:'Bearer '+token};
-    const drive = await graphDrive(cfg, H);
-
-    // Se listan los JSON de todas las carpetas de formatos
-    const items = [];
-    for(const [id, carpeta] of Object.entries(CARPETAS)){
-      const r = await fetch(
-        `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(carpeta)}:/children`+
-        `?$top=999&$select=id,name,lastModifiedDateTime`, {headers:H});
-      if(!r.ok) continue;
-      const j = await r.json();
-      (j.value||[]).filter(x=>/\.json$/i.test(x.name))
-        .forEach(x=>items.push({id:x.id, name:x.name, carpeta, fmt:id,
-                                fecha:x.lastModifiedDateTime}));
-    }
-    if(!items.length){ toast('Todavía no hay solicitudes guardadas en el repositorio.','inf',4500); return; }
-    items.sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
-    mostrarRepo(items, drive, H);
+    NAV.H = {Authorization:'Bearer '+token};
+    NAV.drive = await graphDrive(cfg, NAV.H);
+    NAV.raiz = cfg.library || 'Solicitudes';
+    const inicio = [{id:'root', name:NAV.raiz}];
+    NAV.pila = inicio.slice();
+    NAV.hist = [inicio.slice()];
+    NAV.hp = 0;
+    $('#repoBuscar').value = '';
+    $('#ovRepo').classList.add('on');
+    navRender();
   }catch(e){
     console.error(e);
-    toast('No se pudo consultar el repositorio: '+e.message,'err',6000);
+    toast('No se pudo abrir el repositorio: '+e.message,'err',6000);
   }
 }
 
-function mostrarRepo(items, drive, H){
-  const filas = items.map(it=>{
-    const F = FORMATOS[it.fmt];
-    const d = new Date(it.fecha);
-    return `<div class="draft-row" data-repoid="${esc(it.id)}">
-      <div class="draft-ic" style="background:${F?F.colorBg:'#EEE'};color:${F?F.color:'#666'}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-          stroke-linecap="round" stroke-linejoin="round">${F?F.icono:''}</svg></div>
-      <div class="draft-b">
-        <div class="draft-t">${esc(it.name.replace(/\.json$/i,''))}</div>
-        <div class="draft-m">${esc(it.carpeta)} · ${d.toLocaleDateString('es-MX')}
-          ${d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</div>
-      </div></div>`;
-  }).join('');
+/* ── Movimiento entre carpetas ── */
+function navIr(pila, registrar){
+  NAV.pila = pila.slice();
+  if(registrar !== false){
+    NAV.hist = NAV.hist.slice(0, NAV.hp+1);
+    NAV.hist.push(pila.slice());
+    NAV.hp = NAV.hist.length - 1;
+  }
+  $('#repoBuscar').value = '';
+  navRender();
+}
+function navEntrar(id, name){ navIr(NAV.pila.concat([{id, name}])); }
+function navMigaA(i){ navIr(NAV.pila.slice(0, i+1)); }
+function navSubir(){ if(NAV.pila.length > 1) navIr(NAV.pila.slice(0,-1)); }
+function navInicio(){ if(NAV.pila.length > 1) navIr(NAV.pila.slice(0,1)); }
+function navAtras(){
+  if(NAV.hp > 0){ NAV.hp--; NAV.pila = NAV.hist[NAV.hp].slice();
+    $('#repoBuscar').value=''; navRender(); }
+}
+function navAdelante(){
+  if(NAV.hp < NAV.hist.length-1){ NAV.hp++; NAV.pila = NAV.hist[NAV.hp].slice();
+    $('#repoBuscar').value=''; navRender(); }
+}
 
-  $('#repoLista').innerHTML = filas;
-  $('#ovRepo').classList.add('on');
-  $('#repoLista').onclick = async e=>{
-    const row = e.target.closest('[data-repoid]');
-    if(!row) return;
-    try{
-      const r = await fetch(
-        `https://graph.microsoft.com/v1.0/drives/${drive}/items/${row.dataset.repoid}/content`,
-        {headers:H});
-      const j = await r.json();
-      const id = j._meta && j._meta.formato;
-      if(!id || !FORMATOS[id]) throw new Error('El archivo no corresponde a un formato conocido.');
-      $('#ovRepo').classList.remove('on');
-      abrirFormato(id, j.datos || {});
-      if(j._meta.folio){ S.folio = j._meta.folio; sincronizarCabecera(); }
-      renderForm();
-      toast('Solicitud cargada · '+S.folio,'ok');
-    }catch(err){
-      toast('No se pudo abrir la solicitud: '+err.message,'err',5500);
-    }
-  };
+function navBotones(){
+  const raiz = NAV.pila.length <= 1;
+  const set = (sel, off)=>{ const b=$(sel); if(b){ b.disabled=off;
+    b.style.opacity = off?'.35':'1'; b.style.cursor = off?'default':'pointer'; } };
+  set('#navAtras',    NAV.hp <= 0);
+  set('#navAdelante', NAV.hp >= NAV.hist.length-1);
+  set('#navSubir',    raiz);
+  set('#navInicio',   raiz);
+}
+
+function navMigas(){
+  const st = NAV.pila || [];
+  $('#repoMigas').innerHTML = st.map((f,i)=>{
+    const ult = i === st.length-1;
+    return `<span data-miga="${i}" style="cursor:${ult?'default':'pointer'};
+      color:${ult?'var(--or-d)':'var(--or)'};font-weight:${ult?'640':'520'}">${esc(f.name)}</span>`;
+  }).join(' <span style="color:var(--ink-3)">›</span> ');
+  $$('#repoMigas [data-miga]').forEach(el=>
+    el.onclick = ()=>{ const i=+el.dataset.miga; if(i < NAV.pila.length-1) navMigaA(i); });
+}
+
+/* ── Filas ── */
+function navFilaCarpeta(f){
+  return `<div class="repo-fila" data-entrar="${esc(f.id)}" data-nombre="${esc(f.name)}">
+    <span class="repo-ic carp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></span>
+    <div class="repo-tx"><div class="repo-n">${esc(f.name)}</div></div>
+    <span class="repo-go">Abrir ›</span></div>`;
+}
+function navFilaArchivo(f, sub){
+  const d = f.lastModifiedDateTime ? new Date(f.lastModifiedDateTime) : null;
+  const meta = (d ? d.toLocaleDateString('es-MX')+' '+
+                 d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '')
+             + (sub ? ' · '+sub : '');
+  return `<div class="repo-fila">
+    <span class="repo-ic arch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
+    <div class="repo-tx"><div class="repo-n">${esc(f.name.replace(/\.json$/i,''))}</div>
+      <div class="repo-m">${esc(meta)}</div></div>
+    <button class="btn btn-s btn-sm" data-abrir="${esc(f.id)}">Abrir</button></div>`;
+}
+
+function navEnlazar(){
+  $$('#repoLista [data-entrar]').forEach(el=>
+    el.onclick = ()=> navEntrar(el.dataset.entrar, el.dataset.nombre));
+  $$('#repoLista [data-abrir]').forEach(el=>
+    el.onclick = ev=>{ ev.stopPropagation(); navAbrirArchivo(el.dataset.abrir); });
+}
+
+async function navRender(){
+  navMigas(); navBotones();
+  const caja = $('#repoLista');
+  caja.innerHTML = '<div class="repo-vacio">Cargando…</div>';
+  const nodo = NAV.pila[NAV.pila.length-1].id;
+  try{
+    const ruta = nodo==='root' ? 'root/children' : `items/${nodo}/children`;
+    const r = await (await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${NAV.drive}/${ruta}`+
+      `?$top=999&$select=id,name,folder,file,lastModifiedDateTime`, {headers:NAV.H})).json();
+    const todo = r.value || [];
+    const carpetas = todo.filter(x=>x.folder).sort((a,b)=>a.name.localeCompare(b.name));
+    const archivos = todo.filter(x=>x.file && /\.json$/i.test(x.name))
+      .sort((a,b)=>(b.lastModifiedDateTime||'').localeCompare(a.lastModifiedDateTime||''));
+    caja.innerHTML = (carpetas.map(navFilaCarpeta).join('') +
+                      archivos.map(f=>navFilaArchivo(f)).join(''))
+      || '<div class="repo-vacio">Esta carpeta está vacía.</div>';
+    $('#repoCuenta').textContent =
+      `${carpetas.length} carpeta${carpetas.length===1?'':'s'} · `+
+      `${archivos.length} solicitud${archivos.length===1?'':'es'}`;
+    navEnlazar();
+  }catch(e){
+    caja.innerHTML = `<div class="repo-vacio" style="color:var(--err)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+/* ── Búsqueda en todo el repositorio ── */
+let _navBuscarT = null;
+function navBuscarInput(){
+  clearTimeout(_navBuscarT);
+  const q = ($('#repoBuscar').value || '').trim();
+  _navBuscarT = setTimeout(()=>{ q.length < 2 ? navRender() : navBuscar(q); }, 300);
+}
+async function navBuscar(q){
+  $('#repoMigas').innerHTML =
+    `<span style="color:var(--or-d);font-weight:640">Resultados para “${esc(q)}”</span>`;
+  const caja = $('#repoLista');
+  caja.innerHTML = '<div class="repo-vacio">Buscando…</div>';
+  try{
+    const qq = encodeURIComponent(q.replace(/'/g,"''"));
+    const r = await (await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${NAV.drive}/root/search(q='${qq}')`+
+      `?$top=200&$select=id,name,folder,file,lastModifiedDateTime,parentReference`,
+      {headers:NAV.H})).json();
+    const archivos = (r.value||[]).filter(x=>x.file && /\.json$/i.test(x.name))
+      .sort((a,b)=>(b.lastModifiedDateTime||'').localeCompare(a.lastModifiedDateTime||''));
+    caja.innerHTML = archivos.length
+      ? archivos.map(f=>navFilaArchivo(f, navRutaEtiqueta(f))).join('')
+      : `<div class="repo-vacio">Sin coincidencias para “${esc(q)}”.</div>`;
+    $('#repoCuenta').textContent =
+      `${archivos.length} resultado${archivos.length===1?'':'s'}`;
+    navEnlazar();
+  }catch(e){
+    caja.innerHTML = `<div class="repo-vacio" style="color:var(--err)">Error: ${esc(e.message)}</div>`;
+  }
+}
+function navRutaEtiqueta(f){
+  const p = (f.parentReference && f.parentReference.path) || '';
+  const c = decodeURIComponent((p.split('root:')[1] || '')).replace(/^\//,'');
+  return c || '';
+}
+
+/* ── Abrir una solicitud ── */
+async function navAbrirArchivo(itemId){
+  try{
+    const meta = await (await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${NAV.drive}/items/${itemId}`,
+      {headers:NAV.H})).json();
+    const url = meta['@microsoft.graph.downloadUrl'] || meta['@content.downloadUrl'];
+    if(!url) throw new Error('No se obtuvo la dirección de descarga.');
+    const j = JSON.parse(await (await fetch(url)).text());
+    const id = j._meta && j._meta.formato;
+    if(!id || !FORMATOS[id]) throw new Error('El archivo no corresponde a un formato conocido.');
+    $('#ovRepo').classList.remove('on');
+    abrirFormato(id, j.datos || {});
+    if(j._meta.folio){ S.folio = j._meta.folio; sincronizarCabecera(); }
+    renderForm();
+    toast('Solicitud abierta · '+S.folio, 'ok');
+  }catch(e){
+    toast('No se pudo abrir la solicitud: '+e.message,'err',5500);
+  }
 }
 
 /* ── Configuración del repositorio ── */
@@ -3893,6 +4064,12 @@ function init(){
   // Repositorio SharePoint
   $('#btnRepo').onclick      = repoGuardar;
   $('#btnRepoAbrir').onclick = repoAbrir;
+  // Navegación dentro del repositorio
+  $('#navAtras').onclick     = navAtras;
+  $('#navAdelante').onclick  = navAdelante;
+  $('#navSubir').onclick     = navSubir;
+  $('#navInicio').onclick    = navInicio;
+  $('#repoBuscar').oninput   = navBuscarInput;
   $('#btnCfg').onclick       = repoConfig;
   $('#cfgGuardar').onclick   = repoConfigGuardar;
   $('#cfgRestaurar').onclick = repoConfigRestaurar;
