@@ -119,7 +119,6 @@ a{color:var(--or);text-decoration:none}
 .draft-m{font-size:11.5px;color:var(--ink-3);margin-top:1px}
 .empty{text-align:center;padding:36px 20px;color:var(--ink-3);font-size:13px;
   border:1px dashed var(--line);border-radius:var(--r-lg);background:rgba(255,255,255,.5)}
-
 /* ══ WORKSPACE ══ */
 .ws{display:none;height:calc(100vh - 60px)}
 .ws.on{display:grid;grid-template-columns:222px minmax(0,1fr) minmax(0,1fr)}
@@ -382,7 +381,6 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
   body{background:#fff!important}
   @page{size:letter portrait;margin:12mm 10mm}
 }
-
 /* ══════════════ HERRAMIENTA: FIRMA DE CORREO ══════════════ */
 .ws-firma{display:none;height:calc(100vh - 60px)}
 .ws-firma.on{display:grid;grid-template-columns:340px minmax(0,1fr)}
@@ -463,6 +461,16 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .repo-go{font-size:11.5px;color:var(--ink-3);flex-shrink:0}
 .repo-fila:hover .repo-go{color:var(--or)}
 .repo-vacio{padding:22px 14px;text-align:center;font-size:12.5px;color:var(--ink-3)}
+/* Distintivo de estado */
+.repo-chip{display:inline-block;margin-left:8px;font-size:10px;font-weight:660;
+  padding:2px 7px;border-radius:5px;letter-spacing:.04em;vertical-align:middle}
+.repo-chip.pend{background:#FEF3E7;color:#B36A00}
+.repo-chip.ok{background:#E7F6EE;color:#0F7A47}
+/* Secciones exclusivas de Administración */
+.f-sec.adm .f-sec-n{background:#0F7A47}
+.f-sec.adm .f-sec-t::after{content:'solo Administración';margin-left:9px;font-size:10.5px;
+  font-weight:640;color:#0F7A47;background:#E7F6EE;padding:2px 8px;border-radius:5px;
+  letter-spacing:.03em;vertical-align:middle}
 
 </style>
 </head>
@@ -664,6 +672,13 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
     Guardar Local</button>
+  <button class="btn btn-s" id="btnAdmin" style="display:none"
+          title="Iniciar sesión para completar los datos de Administración">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
+      <path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+    Completar como Administración</button>
   <button class="btn btn-p" id="btnPDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
@@ -697,10 +712,11 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 19V5M5 12l7-7 7 7"/></svg>
         Subir</button>
-      <button class="btn btn-s btn-sm" id="navInicio" title="Volver a la carpeta raíz">
+      <button class="btn btn-s btn-sm" id="navInicio" title="Volver a la carpeta raíz del repositorio">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
-          <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>
+          <path d="M3 10.5L12 3.5l9 7"/><path d="M5.5 9.5V20h13V9.5"/>
+          <path d="M9.8 20v-5.4h4.4V20"/></svg>
         Inicio</button>
       <div id="repoMigas" class="repo-migas"></div>
     </div>
@@ -968,6 +984,8 @@ viaticos:{
   color:'#0E8A6B', colorBg:'#E7F6F1',
   icono:'<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
   version:'02', emision:'JULIO/2026', paginas:'1 de 1',
+  // Dos etapas: el solicitante entrega y Administración completa después
+  subeRepo:1, dosEtapas:1,
   // Mismo acomodo que Capacitación: firma del solicitante aparte y tres
   // autorizaciones; en lugar de Compras, Tesorería.
   firmas:{ solicitante:'SOLICITANTE',
@@ -1161,6 +1179,30 @@ viaticos:{
            {concepto:'Otros',       desc:'Herramientas, materiales u otros gastos operativos. Indicar monto.', libre:1},
          ]},
       ]},
+    /* ═══ Solo Administración: se muestra a los correos autorizados ═══ */
+    { t:'Autorización de Administración', d:'Lo que se autorizó y lo que finalmente se adquirió',
+      banner:'AUTORIZACIÓN — ÁREA DE ADMINISTRACIÓN', soloAdmin:1,
+      campos:[
+        {k:'adm_montoAut',  l:'Monto Autorizado',       tipo:'dinero', w:4, req:1},
+        {k:'adm_fechaAut',  l:'Fecha de Autorización',  tipo:'date',   w:4, req:1},
+        {k:'adm_autorizo',  l:'Autorizó',               tipo:'text',   w:4, req:1},
+
+        {tipo:'sub', l:'Transporte Adquirido'},
+        {k:'adm_aerolinea', l:'Aerolínea',              tipo:'text',   w:4},
+        {k:'adm_numVuelo',  l:'No. de Vuelo',           tipo:'text',   w:4},
+        {k:'adm_pnr',       l:'Clave de Reservación',   tipo:'text',   w:4, ph:'PNR / localizador'},
+        {k:'adm_costoVuelo',l:'Costo del Vuelo',        tipo:'dinero', w:4},
+        {k:'adm_busLinea',  l:'Línea de Autobús',       tipo:'text',   w:4},
+        {k:'adm_costoBus',  l:'Costo del Autobús',      tipo:'dinero', w:4},
+
+        {tipo:'sub', l:'Hospedaje Confirmado'},
+        {k:'adm_hotel',     l:'Hotel Reservado',        tipo:'text',   w:6},
+        {k:'adm_hotelConf', l:'No. de Confirmación',    tipo:'text',   w:3},
+        {k:'adm_costoHotel',l:'Costo del Hospedaje',    tipo:'dinero', w:3},
+
+        {k:'adm_obs', l:'Observaciones de Administración', tipo:'area', w:12, rows:2},
+      ]},
+
     { t:'Resumen de Montos', d:'Total y forma de entrega',
       campos:[
         // Toma directamente el Total solicitado del desglose de gastos
@@ -1195,6 +1237,8 @@ vuelo:{
   color:'#1D6FC4', colorBg:'#E8F1FB',
   icono:'<path d="M17.8 19.2 16 11l3.5-3.5a2.5 2.5 0 10-3.5-3.5L12.5 7.5 4.3 5.7a1 1 0 00-1 1.6L8 11l-2.5 4H3l1.5 3L7 19.5 8.5 22l3-2.5 3.8 4.7a1 1 0 001.6-1z"/>',
   version:'01', emision:'MAYO/2026', paginas:'1 de 1',
+  // Dos etapas: el solicitante entrega y Administración reserva después
+  subeRepo:1, dosEtapas:1,
   // Mismas autorizaciones que Anticipo de Gastos y/o Viáticos
   firmas:{ solicitante:'SOLICITANTE',
            autoriza:['Director de Área','Dirección General','Tesorería'] },
@@ -1342,6 +1386,45 @@ vuelo:{
     { t:'Observaciones Generales', d:'Notas adicionales para Administración', opcional:1,
       campos:[
         {k:'observaciones', l:'Observaciones', tipo:'area', w:12, rows:4},
+      ]},
+
+    /* ═══ Solo Administración: lo que efectivamente se compró ═══ */
+    { t:'Reserva de Administración', d:'Vuelos, autobús y hotel finalmente adquiridos',
+      banner:'RESERVA CONFIRMADA — ÁREA DE ADMINISTRACIÓN', soloAdmin:1,
+      campos:[
+        {k:'adm_fechaAut', l:'Fecha de Gestión', tipo:'date', w:4, req:1},
+        {k:'adm_autorizo', l:'Gestionó',         tipo:'text', w:4, req:1},
+        {k:'adm_costoTot', l:'Costo Total',      tipo:'dinero', w:4, req:1},
+
+        {tipo:'sub', l:'Vuelo de Ida Adquirido'},
+        {k:'adm_vi_aerolinea', l:'Aerolínea',    tipo:'text', w:4},
+        {k:'adm_vi_numero',    l:'No. de Vuelo', tipo:'text', w:4},
+        {k:'adm_vi_pnr',       l:'Clave de Reservación', tipo:'text', w:4},
+        {k:'adm_vi_fecha',     l:'Fecha',            tipo:'date', w:4},
+        {k:'adm_vi_hsal',      l:'Hora de Salida',   tipo:'time', w:4},
+        {k:'adm_vi_hlle',      l:'Hora de Llegada',  tipo:'time', w:4},
+
+        {tipo:'sub', l:'Vuelo de Regreso Adquirido'},
+        {k:'adm_vr_aerolinea', l:'Aerolínea',    tipo:'text', w:4},
+        {k:'adm_vr_numero',    l:'No. de Vuelo', tipo:'text', w:4},
+        {k:'adm_vr_pnr',       l:'Clave de Reservación', tipo:'text', w:4},
+        {k:'adm_vr_fecha',     l:'Fecha',            tipo:'date', w:4},
+        {k:'adm_vr_hsal',      l:'Hora de Salida',   tipo:'time', w:4},
+        {k:'adm_vr_hlle',      l:'Hora de Llegada',  tipo:'time', w:4},
+
+        {tipo:'sub', l:'Autobús Adquirido'},
+        {k:'adm_busLinea', l:'Línea',   tipo:'text', w:4},
+        {k:'adm_busFecha', l:'Fecha',   tipo:'date', w:4},
+        {k:'adm_busHora',  l:'Hora de Salida', tipo:'time', w:4},
+
+        {tipo:'sub', l:'Hospedaje Reservado'},
+        {k:'adm_hotel',     l:'Hotel',              tipo:'text', w:6},
+        {k:'adm_hotelDir',  l:'Dirección',          tipo:'text', w:6},
+        {k:'adm_hotelConf', l:'No. de Confirmación',tipo:'text', w:4},
+        {k:'adm_hotelDel',  l:'Del',                tipo:'date', w:4},
+        {k:'adm_hotelAl',   l:'Al',                 tipo:'date', w:4},
+
+        {k:'adm_obs', l:'Observaciones de Administración', tipo:'area', w:12, rows:2},
       ]},
   ]
 },
@@ -1570,6 +1653,8 @@ function toast(msg, tipo='ok', ms=3400){
    `cond`  → una condición
    `todas` → varias condiciones que deben cumplirse a la vez            */
 function visible(o){
+  // Las secciones de Administración solo existen en modo Administración
+  if(o.soloAdmin && !S.modoAdmin) return false;
   if(o.todas) return o.todas.every(cc=>visible({cond:cc}));
   const c = o.cond;
   if(!c) return true;
@@ -1895,7 +1980,7 @@ function renderForm(){
 
   // Secciones
   $('#formBody').innerHTML = vis.map((o,pos)=>`
-    <section class="f-sec" id="sec_${o.i}">
+    <section class="f-sec${o.s.soloAdmin?' adm':''}" id="sec_${o.i}">
       <div class="f-sec-h">
         <span class="f-sec-n">${pos+1}</span>
         <div><div class="f-sec-t">${esc(o.s.t)}${o.s.opcional?' <span style="font-weight:500;color:#7A7A7A;font-size:12.5px">· opcional</span>':''}</div>
@@ -1927,12 +2012,22 @@ function actualizarProgreso(){
   $('#progFill').style.width = pct+'%';
   $('#progPct').textContent = pct+'%';
   $('#progTxt').textContent = `${reqLleno} de ${req} obligatorios`;
-  // Se avisa cuándo el PDF además archiva la copia en SharePoint
-  const archiva = S.fmt.subeRepo
-    ? ` · <span style="color:var(--or-d)">al descargar el PDF se archiva en SharePoint</span>` : '';
+  // Se avisa qué hará el botón de PDF según el formato y la etapa
+  let nota = '';
+  if(S.fmt.dosEtapas){
+    nota = S.modoAdmin
+      ? ` · <span style="color:var(--ok)">modo Administración · al descargar pasa a Completas</span>`
+      : ` · <span style="color:var(--or-d)">al descargar queda en Pendientes y se avisa a Administración</span>`;
+  }else if(S.fmt.subeRepo){
+    nota = ` · <span style="color:var(--or-d)">al descargar el PDF se archiva en SharePoint</span>`;
+  }
   $('#abInfo').innerHTML = `Folio <b>${esc(S.folio)}</b> · ${lleno} de ${tot} campos capturados`+
     (reqLleno<req ? ` · <span style="color:var(--warn)">faltan ${req-reqLleno} obligatorios</span>`
-                  : archiva);
+                  : nota);
+
+  // El botón de Administración solo aparece en los formatos de dos etapas
+  const bAdm = $('#btnAdmin');
+  if(bAdm) bAdm.style.display = (S.fmt.dosEtapas && !S.modoAdmin) ? '' : 'none';
 }
 
 function actualizarTablas(){
@@ -2878,9 +2973,12 @@ async function descargarPDF(){
        la ventana de inicio de sesión de Microsoft necesita el gesto del
        clic, y se perdería si antes generamos el PDF. Si el archivado
        falla, el PDF se descarga igual. */
-    if(S.fmt.subeRepo && location.protocol!=='file:' && typeof repoGuardar==='function'){
+    if(S.fmt.subeRepo && location.protocol!=='file:'){
       if(btn) btn.innerHTML = 'Archivando…';
-      await repoGuardar({yaValidado:true});
+      // Los formatos de dos etapas usan el flujo Pendientes / Completas
+      await (S.fmt.dosEtapas
+        ? repoGuardarEtapa({yaValidado:true})
+        : repoGuardar({yaValidado:true}));
     }
 
     if(btn) btn.innerHTML = prev;
@@ -2972,7 +3070,7 @@ const FIRMA = {
 };
 
 /* Marca de Sipnology usada dentro de la firma (mapa de bits del original) */
-const FIRMA_LOGO = "iVBORw0KGgoAAAANSUhEUgAAAXwAAAImCAYAAABQGjHGAAAq+ElEQVR4nO3dX+gc1f3/8dfnh0khEYxgBCOYgimYQuNFcmEEFbRgCirEghbMF7QXyYUWEkELKpiCFlRQIelFvFBBCyoYQQu1YAQtaC+SC1MwhURIBFMwgh/BCJqL/V2cz/az2c/8OTNz/s55PuBDm93ZmePumde+98zMmYXJZCIAwPj9v9gNAACEQeADQCEIfAAoBIEPAIUg8AGgEAQ+ABSCwAeAQhD4AFAIAh8ACkHgA0AhCHwAKASBDwCFIPABoBAEPgAUgsAHLjYZ8LczQnsBawvMhw/8j4udYcHBOgAvqPABoBAEPkp3n5aHZFxwuS7AqUtiNwCIyGcwT8TwDhJDhY9S3RFgG9cF2AZgjYO2KFGfTv+ApFd7vpZKH0mgwkdpnu/xmgWZsJ/+/wVJxzq8/pMe2wSco8JHaWw7vE1Vfo+kNx2uD/CKwEdp2jr8eUmXOl6nJG2U9GXH9QJOMaSDkuy1WKZr2Eumet/fssyZHusFnKLCR0naOnvVsMvfJV0m6UNJTwzcBsM6iIoKH6VoO3C6o+KxQ0uPb5f0uJYvqtrdsw2ne74OcIIKH6XoU92Heg0QBBU+0O0Uy1lUS8gKgQ+YMXpg9Ah8QNo04LUHnLUC8IzAB4ZZF7sBgC0O2qIUPg7AVr2Og7ZIFhU+0F/X8P7JSysASwQ+SvFSy/NfVTy2IOnOmuXrHm9yocdrAGcY0kFJjkra2vB8U8V+q8zVtnV2Sjrcsn2GcxAVgY/S+Bpj7zPeDwTFkA5wsTU9XvOBxTKneqwXcIoKH6Wx6fC2UyS/Leluy+1S3SM6KnxgpbUyE6c1mcg+7IEkEPgoje3ZNbuX/lZVPMfVtcgSQzooVZeO3/XiqrbXA1FQ4aNU73VY9o2Z/39Fx+0Q9kgGgY9S3dXzdd90WJawR1IIfJTM9j6zfWbTPN/jNYBXBD5K9nvL5boO40j9b6oCeEPgo2QfSnrBYrmNM/9/p+W6b+neHMAvAh+le1jSsx2W32+xzK5+TQH84rRMwLCdY+dHSasblrtNzZOsAdEQ+IDRtCPMTrXADU6QLYZ0AOPxhuf+GawVgEdU+MCyup3hmKRtLctMUeEjWVT4QLvZKZO5TSGyReAD7S6b+f9NB2yBpDGkAyz7VtK6muemQzUM6SBbVPjAsn0WyzBlArJF4APLXrVY5k++GwH4wpAOcLG6HWJ2qKbu4ivbWyMCUVDhA939rObxC0FbAXRE4APuEPhIGoEPdHdf7AYAfRD4QHdU8sgSgQ+4wxcBkkbgAxc7NeC1BD6SRuADF3vfYpl1vhsB+EDgA92tit0AoA8CH7iYzbAMgY8sEfjAxWzC/OyA1wLRMLUCcDGbqRXqljsn6Uq3zQHcocIH3KHCR9IIfMAdAh9JY0gHuNiQIZ2q5YBkUOEDQCEIfAAoBIEPAIUg8IFle2M3APCJwAeWXRG7AYBPBD6wjNkuMWqclgks+1b1M2FyWiayR+ADy5p2BgIf2WNIBwAKQeADxjWxGwD4RuADxo4Oy97urRWARwQ+YGztsGzTbRA5KIZkcdAWMNp2hNmDsTY7DQdvkRwqfAAoBIEPAIUg8AGgEAQ+IO1sef5cj3Ue7dMQwCcCH5AOtzx/rMc6Oa8fySHwgXbHe7xmjfNWAANxWiZK1/UUy+sknbBcN6dmIilU+CjZUz1e84DzVgCBUOGjZG2d/7ik6+cea5pCeR4VPpJC4KNkXa6utX3NvHWSvuv4GsALhnRQqnsCbWcx0HaAVlT4KFXf+XD67DAM7SAJVPgoUd8q57qer3u75+sApwh8wN6DPV+32WkrgJ4IfJTGduz+1Ny/90p6qOc2CXwkgcBHSW6V9Kblss/N/fuFgdueSLpp4DqAQThoi5J06eyzB1qfkvS4ozZwABfRUOEDK+2Z+zdX12IUCHyUwra6f1PSSzP/vkHSBvfNAcJjSAelsO3os0Mur0na5aEtDOsgCip8lKBvVXOH01Ys4+AtoqDCRwn6Hqz1uXNQ5SM4KnyMHRUNsITAx5jd33H59300ogZfRAiOIR2MWdfOPT/M4nvn2KZ+98sFeqHCx1i93HH5+bD/zFVDGhyVdCjAdgBJVPgYp93qFqSupkHuiwO4CIIKH2PzjLqF/WLFY2+4aQqQlktiNwBwqGtV/r6k3wxcB5ANhnQwFq7uRBVrh2BYB94xpAMAhSDwMQZ9bj14uOKxA0MbMgA/teEdQzoYg6/UfUbLlIZzZjG0A2+o8JG7icYT9pK5KxfgBYGPnPUJ6fect8KtI7EbgPEi8FGau2I3wML9sRuAcSLwkaOJ+lX3dfPWpDKcM/WKpI9iNwLjw0Fb5GZIh50fu79W0qkB6/ONA7hwigofOfmg5+te0crwfERph72U3i8PZI6pFZCLvuF3t6R3Zv79kaSbhzcnmImo9OEIQzpI3ZAOukvSXx2uLzaCH4MQ+EjZ0M6Z8vn2fVRN9gZYYwwfY3Vv7AZ4sCN2A5A3xvCRqq8GvLZu6GPIOoHsUeEjNU+q33QJU1Vhf9/AdaZkIumO2I1Angh8pOSQpP09X7tH1WF/haTX+zYoUe9Jejd2I5AfDtoithskfTpwHUck/bri8UckPTtw3SnjrB10QuAjplvlZrKwuuAroXMT+rBG4CMmV52PwAcsMIaPWD4b+PotMmE3H3hXSDqqMsJeMv+dX8duBPJAhY8YhnS6ByS9WvPcHUp/vnufqPbRiMBHaD6unpXMWSt3Dlz3GBD6qMWFV+N2raQ1klZLWiXpgqRzkr4M3I77ZWas9OVrSes9rj8npyX9PHIbkCgq/PHp8oH6rAZPStrkeJ3z7X1e0j7H2xiLjyXdErsRSAsHbcel67d33ztHNXlmaZ1Dw/49LR+UrTo4+7kI+yY5TQGNQAj8cbhfw4L7I5mzW4a6StKjDtYjNd979qikzY62M2b8fMdFGNLJ2xtyPytk32EeVx1ptcyxhio3yQxVoBsO5EISB21zdYOkg5K2elj3bHDvWfrfc5K+kznwu2bpscOOt9s21zuVSX8TmYPa38RuCOKiws/PazJ3chqTtgqUTuoO1X7BGMPPz9jCvmlIysdB5dJNZKaLRoEY0kEMG9V8LcAqST8FakuJXpf5DP4cuyEIiwo/L2Oodo+oOew/EWEfwtMyx4JQEMbw8zGWD6ppDPkySYuB2gGDMf2CMKSTh89jN2CgpyU90fB86geiD8pM2HZe0g8yp43+MPP8Gi2fwbR26bFVGn5jlxAmkrbLnIn1ReS2wDMq/Dzk/CHdLemdmucek/kySInvivdbmS+DtW0LRkLFP2KM4cOXXTLhURf29yhc2J+RmWpgi8zByo1aOW1D1fQNPlwu6dKK7W5UGvfePRq7AfCHCj8PuX1IMc+rf1bSHz2uP6RDknZH3P4xSdsibh+OEfh5yOlDCh325yVdLXMl8JhdK+lUxO0fl3R9xO3DAYZ04Mo21Yf9tXJ3EdUpXTwUcqnGH/aSOaA6+98d+mYvWyR9FXibcIwKPw+pf0hNVf3ncjez5UOS/uJoXWMRq298KunGSNtGT1T4GKrudMpvZcJoSNgflDnLZ1rVEvYrzVb9IaeM3q7lX20TmRverGl8BaKjws9Dih9SU4U3tL2bJf1n4DpKl2Kf4RdaZAR+HlL8kOqGcXzdpBzdpdhvpt6U9LvYjSgNQzroajrEMq/PQdm7ZYYGQp4HX5Lpe7pJ6d045l6Z/vJg7IaUhAo/D2/LhGNsd0r6W8XjXTvRLkl/Hd4c9JTqTn9Q0h9iN2LMCPw8pDCp2D5JL1Y8fp+6XSHKOG4aUt3x+ZXnEYGfl28lrYuw3S2S/l3xeJfOs0NmwrF/OmkRXEh15yf0PWEMPy+XB97eDpmdbz7st6pbWCxI+ocI+9QsSHopdiMqpPpFlD0CH03+UfHYk7KfYOtOUa2lbo/MxG2pIfQ9YEgnP6E+sAdk5oDvu32CPk8pBcJ5makz4Ag3QMnPgvzvlPdKeqvi8SctX0/Y5ytE/7K1VqYt9CdHGNLBvH2qDvuJpP0tr31U7JxjcDx2A+Z8G7sBY8GQTr58fXB1F1X1eR3ylVIwLCr8CQujRIWfLx8BWzUR2mmL121w3A7El9IX+LrYDRgLxvAhSSck/bLicSr7sqU0ng8HqPDzdszReqrC3gZhD2SEwM/bHo/r/nvL8w943DbScW/sBsAdDtrmz8UHOF+pN61zrcwUCShHCiHBr0kHqPDz57rSPtTyPGFfHsJ2JAj8/K0e+Pr5m2Hf2rDs+YHbQr5Sm08fPTCkMw59P8Su59xT6ZUtZljQ9xygwi/Xpx2X93mAGHngF17mqPDHoc+HWDXHPQdr0eR2Se9H2jYVvgME/jj0+RC7nJlTtTzKFCMwXpD0cITtjg5DOmW6ee7fB1qWJ+wxFbovHBNh7wyBX57VWnnnqYdqlt0vwh4rheoTr0jaFmhbRWBIZxy63m7Q9vWEPeqECA76n2NU+KhzInYDkDTCOEMEflnOVTxWV6n1nVAN5djscd18oXhA4Jflxbl/t02jADT5j6f1vuRpvcVjDH8cbD/EdZK+s3wdFRZsvabqm+d0dVzS9Q7WgxpU+ONw0GKZ7bo47OucULlh/5XMl2Cfv6citDcV/yfTZ6Z/Zyxesyhzdtjs60oN+2skfa1+/e60zBeuFSr8cTig+lMrp+ZDfKekwxbLlcLFjnBMnEY4711Jd8VuRKL2ylxU5krrvkuFPw59ZsxsmhWzNJc5Ws9WR+sZE8K+2rVyG/aSRdFC4JeLO1ZJv5LZSRYdrnP6U/ukw3VifE55Wm9j6BP443Bdy/NV59Sv9dGQzBz3uO5NMjvfgx63AVSpDX0Cfxzm58aZ997cv+/31I6chDp4ZXNAHeW4T9363jaZ4qHrdOZ7qx7koO04dJ3psuTTMa+R3VkkLp2S9IvA20R6Vkn6yWK5xyX9ueH5vUt/G1vWs2JfJvDHgcC394nMKaqhjf19RbuTMtV6nU2SvuiwvrbiZZ3mTsUm8MeBwLcXq8Ofl3RppG0jDT72u7b+vCjp8uk/GMMHwlgrjp2U7CZP622bz2idpN3TfxD45Xk+dgMiuj3y9l9RzcE0jN7HNY8f07Bf1f/R8pXKdf43ZxZDOuPQZUjnqJovEBrzkM6P6neRmg9jfp+xrO0+wC77QeuQERV+eVbFbkBEqYQ9yrEldgNmEfjlaZpGwNfVfylwNX0C0MXe2A2YxZDOOHQZ0mla9jZJHw5vTpJS7OgM64xfU79zfeYWQzoF2NnyfJeflEeGNASdTSS9HbsR8Oblluf/FaQVM6jw89f0AVbdUKLrOftjkXJH3yHpH7EbAWcek/S0xXKu97XWCp/Az1/XizkI/DSN9X0vkW1fCx74DOnk7f7YDciITcUV00TmRjbI13RqbBtRvuAJ/Lxxww17r8dugIW2u5YhXb+K3QAbDOnkrc/wTKlDOlL6wzpSxYRXyIJt33pf0m8Ct+F1mfsOE/iZI/C7y6XDj/1zGIuvJG2wWM7X53m7zNQJdVMlX7TdSzw1AsAwExH6KetSOJzz1ormaRtW3MaUCj9vVPjdtc1Jnpqxfx65sgnOFyQ9bLHcI5IuLP2dkfQ3R+1Y0Xeo8PN1f+wGZGqH8ppCYnaH3iLp37EaAknSk5L2tyxj8yXtu9KuPCuNs3Tyda/FMtxAe6UvJO2L3YiefN50Hc32yoT0/prnT6h9muKd6nbq5hBPVD1I4OfpkEyl2iapmfoS8qLyHSr5OnYDCnSNzPBMlYMyfemXLes4Kemwy0Y1qO3bjOHnqcuH1uX2hlXLj1nOnf8nST+L3YgRe1AmzNu07S8h+9h7ku5qWoDAz88HMrNa2iLwm+W8A5T2WYXU1i82SPqvg/W4YtUehnTy0yXsJXOQCfXaxl1TlvOXVcrq3tezWu4vTeH6gcKN1du0538I/PHb3b4IMjaZ+fssclty1xTSN0u6uuX19y29vmtR1tfZri8g8MfP5ipALFdK07+HZHao8zEb1dEWmcD5UWXfrL6LAzJXy84H/fsy7+e0P/yzZT2faPh8TWckvSlpm6TNWtkn5//avoBWYAw/L1tlbkLele0dryTpWUl/7LGNEuS8s+Q6bOWS7ed3r6S3HK2rzaKkyx2tqxUVfl5czMi32PI8Q0D1Zqur9TK/njbI76XzruT8ZeXCI5bLHVN72O8d1hRJy/0oWNhLBH5uXnGwjhMO1gHpG5kDZf+VdKXaf37P/oU6H3veRNLfI207pkMyv1yrnJO5pmX62WxrWddO1Z+TX6WuD0TBkE4ertOwoJ7tYK9J2tWwLOd3h3GF0vllsHrpfy9EbYUbz6vbldS+pkH4WNItPV7nFRV+HlxOkdD2K2F1y/Nw4xuZsFmM3A7JfMn/JHPwMkcHtHyGjeuw/7xjW44trTe5sJeo8HMx9EOan7WPi6/SZTM5l0+LMjfL+EHShxHbUeUmSauW/l6QmfJgbY/12PTvz2Q/Ncl5SZf2aEdwBH4ehn5IZ7XyFC5CP23fq1+Y+fappBsDbct2eoMuNkv6T8sytvvbMbWP+SeFIZ30ufhGrjoX3/WOBLcu1coDfSlcE7Bdy8Mnp2XuuOTS8zPrd9lHX5B5D+vC/hnZXx1re4A3OVT46XP1Ac1X7G0HgkNWcrDHDttd06/Vru/namV8cJsKP22feFx328/a7R63jf66nBKI+tMxuzoi88WRbdhLBH7K7pPb0K36udp2TvBEZh5vpONhLX9uKY7xp+KgTDVed9X496qv7p/WyuG0X7tuYAwM6aTL1wfT5z632R2cKgg78Eq7JP214fliT1igwk9T6POh2w4Gbg3SCvQxW4W+GbktKVhUc9g3TRc+nbBstAj89LwmvzNcVlU3bTMBSm7mD4Ffv9PIA6vBdK76qrlpZqeQ3l/x/GE1n8EzGgzppCfEB7JH0ksz/94pu/ldSg2THJW2Y9f1zXcl3dnwum0yQ5ZFIPDTcYfMPSlDqdpB2i50WVTg2f0wSCk7d9/TLtfLTHFRDAI/HTE+iD4HcOtehzT5uFo1FW3XijT15SL7MGP4aXgs0nb7nudPlZCPv2i84VYX9mtU30fPabzvRysCPw1PR9rudq08AydWW+BXzjdrn9f03/KY6s86W5C5d0GxGNKJL4UPYH7nsW3TWAKkNCn0uSHq+h3j9S2o8ONKdcezrQYnyncO9ZItyNykOzdvqr5f1k3iNu3LxYe9RIUfU2pv/NAJpvZL+pObpiCQv8vc3i8XXSv7cyp8CGceFT6m1jQ895PF6/dLut9JSxDKb2I3oIO6L6anGl5D2M8h8ONIrbqXzIGuunb9TOZirTavyNyNCPlYkHSbzJWqKfpY0jpJ/6h4bq+kxyseH9MBaqcY0gmr6w2WY3E5f/jNspu6AWlIKRDOSPp5xePPSHq05jUEfQMq/LByCPs2pzou/7GXVsCXuiCNoe7K8weCtmJECPwwVimtyqnNRNJHNc/9QnFvsg2/npPdvEoh1M1lv77isV2ium/FkI5fY3lz+5z3POtZ1e+8SNNjin8RXlW/26uVd/0i6C1R4fvxlMYT9pL5b6k6G8L24FhKwwSw82fFC9LpdMXz3tXKsH/Ff3PGgwrfvVwOzPZVFwKfyP6WjEVNSZu5VCb1k1a25aykqz23ZVSo8N0bc9g3uVHS65bLHtW4fgGNWegq/96ax9+ueIyw74gK362S3symIHhb0g2yv3PXmzJ3a0LafPfvuj71vVbesH2zCrhDlWsEvhspHOCKZbukf7Us06eTcSAuTb4Co25u+7rt0T96IPDdKP1NbNv5CPzx8DX/zkZJX1Y8XtV3jkj6tYc2jB5j+MOVHvZS83n7kgnvfep2fvdE0u4hjYIXvubfqQr7d2uWJex7osLvhzetmY+Kf9Z5SZcOXAf689H/5/tM3VlfByX9wcP2i0CF3x1h367tPdoh6fiA9c8fwENYrofb5s+tl+pP8SXsB6DCtxfrjdog6b8e1/+rpW2sUv3cJUPtkfRSyzIu3t+2m1rDLVf7xPwXyAFJD1Ust1rSBUfbLBKBbyf0m7RfZjrYtrNffPD539r25eVi2wz3hOPi7LQtkv499xhn5nhC4LcL9Qal2JlDjNVWeU1mMizf28Ewl0laHLiOqs+pqt/xeTrAGP5KN8mcHTCR/7C/TWnfrGFh7m+zTEW2ecA6JzN/dfch/T8Nf08mFX8HJF0n6dqB64bx3cDXn6h4jArUIyr8ZV+retpVF9ZK+sHTulMxpCM1hfsHMl+MPqX6hZuDIfvN/HDOjzLj9PNekPRwz21gRumB7+s/fr2kbzytOwd93tezMpX9hw3LvKxwN7/gS8DeZzLh3dX8e8zYvWclD+kc8rTeBZUd9pJ5D9rOypm3QeYKyqYvi98r3B20iq6EOro+dgNgp8TAPy0/V3GeE5XIrD1aHvt/SNXnWtdpCttbFG5G0hDHccai660vbeaxPyH2KafGOKRzj8wZHncG2h4dsrsune6UzNz5VbNpxuy8x0VlO2un7KfOqNpnDmllEca+5VjqgX+D7M9Ff0P1c2n7ck7SlYG3OQZ9O918AIQc069zRtLPI7chBV1O0eRUzEhSDPy2Br0u07GqrsQLiQt8hntX3X6J/STpZzXPPSlpk4afv9/HoqTLI2w3NbZhMh/kdQd9CXzHYgf+7ZLej9mAnko4zTK0rh2xLQyOStrasy1DlBxSNp9hVaFU9brSz3TzIuZB2zuUZ9ivE2Hvw4LcDsltU7gzemBvftK8B2uWI+w9iBn4vibq8mH2atOhVxei3ltafp/bbrIxkRnGuaphmVs6rM+V5MZIEzM/l9KtFctwg3tPYg3p9L1QI4aSf6LH1rVzblN7WJQ8N5JvNlfd3i3pnZl/c7A2oBgV/hvKI+zPi44XW9Vl9k2OWiwzrfg/bVnuXMVrZv/a5vM/bdGWsXnCYpl3Wp7vclc0dBQ68D9S+FMnu9ohs0NzBk58F9R9crnpxVKftSx348y675WZ2mHTzGNXtmy77Rz8jSov9Ne0PH/WYh2/ddEQVAsd+DcH3l5XCzLz0CM9r3dcfotM8O+0WPYtSVdL+qLjNja0PL9RjOnPujp2A0oXMvBT7vgM36RvOmXydKoGW4dl+t5rHtr0X9FvZjXdjcrmQOyQ217CQqjATznsGb7Jz18kPdvxNbvUvR8e0MXz6dfNo98W+qc7bjdX5xues/mSthnywQChztJJNfCpzvLWt181XbHbtv66PnNS5hhAlVKmX7hf9ZOi1d2PdvY9Zn/0rMTZMqdsZutD2mzPmJm3Ws1fFm80PD+R9PeKx3+h+nP9N9o3bbTabj5O2AcQIvBdT0PsSqgpduGfy1krn1L7mWQ7VH3BFwf8+1mM3YBShAj8VQG20dUZccXs2DzqaD2PWy6339H2Sjb9FVV1b1t4ECLw287NDW1BZYynluY5LQ/xHLR8zZBiJNVfrrmYHTK7MVorClNahW8bBMjbH2R3h622i7PQje2V0Z97bQVqhQj8toM1If0hdgMQzMNqv6/uZknPzz32tOX6Oci4Ut3Ml/NDNnWnt8Kz0gIfZZneV7fJ/MH7J9R8Prka1lk3l8+5msfHpm6OrPnpxLvOkQRHQgT+mQDbsEFFVq4jHZe/VPWn7db1o6tUf8OVLztuf2z2x24AjJIuvCLwy/WY2odqhvaPpj5eSt+rew/m//vnlyvl/YmulAuvbE+1wzj9xfP6q27iASQnVIX/ucwBshhsL6PHuNl09L6VZtu6S6lgq96Hs1o5SyYVfiShKvxfBtpOFcIekvSAxTITSY9Yru+klidVq7NOhBlTIick5JBOjI7fdQ51jNerlss9q+YQf37p+bqJ0maVfjU381UlJvQYfttt5VzaLDOHOjDV585ZX8nMr3ONzJz6tnMwdT0zaIx+X/HYG8Fbgf+JcRPzEBvcIHNzCmDeI+o+l34fJQ7l2IzNzy/zqZhaIZixnqVD2KPOc+JGG7FUTStd+jUKQcUI/F2e1x+iekPerpa/CrzrTdfHou4q41lV9wv4neuGoF6MIR3J77BOiTsb+nPZF0vte29Lunvusfck3TX3WJc7iMGDWIE/5XLjjNtjiK8lre/xumOStjluS05sr679larvTEbgBxR7DL/L3OV1XlpaD2GPIa6U6Ue2s2WuW1q+5LDv4ubYDUD8Cn/WVzJVuq0jkn7tqS0A2u1V9X0Hqqr206q+ty8VfkApBf68nZIuk5lKdXoTlVVLf8/FahSA/7Edzum6LDy5JHYDGrwTuwEjc53MvQm+iN0QjEJdgL8ZtBXoJOXAx3BM2YvQDlc8xv1/ExH7oC3c+0Dtk3ppZhmm9kVXhxqee6vj8ggo5TF82NkrMxNk3e3luqLyR5suvxyv08p72s7aIunfg1sEKwzp5M3Ht/VHkm7xsF6MX9V59m0z1j4urrYNhiEdzLtZ9nPCA7Our3is7j6/U5f5aAiqMaSTp1AfGsM7mNf19EqfdxpDR1T4+eka9osDtvX1gNdifLr2vee9tAK9UeHnx+YDa7uP75OS9ltuj+oLUr/79tqGC30sEAI/L65/HrNDwkZbP9kn6cWOr5lF/wqEIZ18+BgLtV3++47rxXi8a7HMi3P/PtBxGwwdBkKFnw+fB784sIY6Podyps7JzFYKz6jwx2NIIL9isQyVAebdWfHY7T3W0+c+BOiBwM9D29kO7w1c/+8lrbVY7qqB20E+blfzl/wOSX+be2wi6X1vLcJgXGmbhwstz8/fSq6PH2R+JTTt5GfF0E4JbH7N/WPu39cO3OZV4iZG3lHh5+GG2A0AZlR96X8+cJ1nB74eFgj8PDTdHi50xT2RtCbwNhFO08yWx1Td356UuVHRUBMN/6WABpylk4eQ89rbdohFSZc73jbiWSPpfMPzr8gc65nnK0AYOvSAMXz0tU5mZ2d623FoCvu1Msd45vmsxr+SdLXH9ReJCj8PKVb4s86KnTNnffuX7/CgyneMMfz8PRa7AZI2aPkOWvdEbgvsXabm0G66P22ISvF0gG0UhQo/D32udvS1LRtUZul7V9UXTs1arepTgj+RtN15i6q9IOnhQNsaPQI/D0fVfCOJFIZ1Zj0t6QkXDYEXV8hMZ9Cmql99rfBXxlJAOMKQTh7apj5w/a29sPRnM+VClcclvS1plbMWwaW2sN+v6pD9SHGmQaAqdYQKPx8+Jzh7RtImSb8duP06G8RVlCm4SdLHLcvcK+mtisevlXTKeYvsUeU7QODnw+Xc9btVfYHNoprPrWd8P097ZcbCbQy5VaFP9BsHGNLJx3SYpc30bJk35h7fLXNu80T1V1Ouk3S/RRvaDva1te/HAa9HNxO1h/17qu9f9yh+2MMRKvw8hfrQFtVc8T8mc4DWhVOSfuFoXaXqM+xyRtLPa55LKRyo8B0g8PMU8kP7VNKNLcs8I+lRR9tjx+6va784Jmmbo3X5Rr9wgCGdPK2X9HqgbW2X2fkPSLquZpk/anlIYJOaL9Nv0zR5F+o90mHZDTKfVV3YnxzeHKSICj9/sT5A2+MJrjwr88UC4wNJt3V8zXFJ1zc8f1LmCztFVPgOUOHnb0uk7b5tsczQA7yzHpX5AvnW0fpydFLLB+W7hv1Dag77idINezhChT8OL0t6IMJ2X5CpGj+U9GXLsg/KfDntdrTtlyQdlPSdzOX/F2RmdKya1TF3j8j8wumrrTr+SmaYJ2VU+A4Q+OPi8uBpXyck/bJlmdQOOqfkpMzUB+scrGu9pG8anq+7HiNFBL4DBD6abJW5MUbb1ZlV2sJm6laZ+5muX9rerh7bsvWopOc8rr8P11ew7pf0FzW/95fJnHKbEwLfAQIftoZ0lP2S/hR4m6H8tPS/Lm7xN0TdzJazPlLz7TJTRuA7wEFb2FqQdKTna/er343Ydynu/C02Vitu2C/KfDZtYX9S+YZ9jAnbRokKH33cIDMMc7jn609I+pfM0MMJ9TvQep3MgeBNknb0bEdu+kw7vVVmeu0cnZN0ZexGjAmBD1dcdaShP91tbuyRmy7vyfOS9vlqSGAM4zjGkA5c2e9oPROZ0OrrLpmg2KhhV/ymoutwEWGPWgQ+XPmTlqdXWCszJUPXi4Om9mn5AqOP1O8+uV9KunSmTbZ/ob4kjsiEeVt72sbmJTPE9pj8HOTeZ9lOlxfZwROGdBCCj07muwIc0uZFmQvD/ijpDplAfnzpsT2DW7bM1857Vub4yp97vv419T+91uZsI/RE4CMEH50s9AG9K2b+d72Wb994QWaK4e+W/kI4JHdXLM/y8SV6QGZah9DbRQUCH6GE7mg/yUz/+4XMmUCnVH3rvlTcIPNr4ILMxW7rZb5cNsvvHDchw/ZamS/K/wTcJmYQ+AjpBpmpDlJ1m8y8QCENnSenL6rqAhH4iCHlTndeZvz6C5kpCFbJVNxrlp5fK1N5r9LyZG2LS899J/NrYjqh2zmZKQ6qbuAe6/RJgr5gBD5ioeOF9YCkV2M3AnFdErsBKNaCCH3fzsrMXBrqYDISx3n4iGn2vH24dVjS1SLsMYPARwp+UPupe+jmt7EbgPQwho/U0CGH4aAsalHhIzXHYjcgUzeLsEcLKnykiE7ZDUEPK1T4SBEBZo/3CtYIfKRqQXGuQM3JhtgNQF4Y0kEO6KTVqO7RCRU+cnAmdgMSRNijMyp85IKOahD06I0KH7ngjkrmLllAb1T4yNFjkp6O3YjAqOwxGIGPXJXUcQl7OMGQDnJVyimJd8duAMaDCh85G3vnpbKHU1T4QJq2xG4AxocboCBn0wp4bJU+lT28oMLHGOyP3QCHCHt4wxg+xmCNzM3Hx4DAhzdU+BiDH2I3wIHHRdjDMwIfY7Eg6b3YjejpXkl/jt0IjB9DOhibHDs0lT2CoMLH2JyL3QAgVQQ+xubK2A3oYJ+o7hEQQzoYo6OStsZuRIufJP0sdiNQFip8jNFtsRtgYU/sBqA8VPgYq9Q7NkM5CI4KH2O1IOmF2I2osTl2A1AmKnyM3YOSDsZuxAwqe0RD4KMEKXVyAh/RMKSDEqQSsttjNwBlo8JHKVLo6Kl88aBQVPhAGIQ9oiPwUYqYgcvdq5AEhnRQklidneoeSaDCR0kIXhSNwAeAQhD4KM3ZgNvaIn5VICEEPkrzUMBt/TvgtoBWHLRFaVbJTE3s23FJ1wfYDmCNCh+luSDp0QDbIeyRHCp8lOplSQ94XD9j90gOFT5K9XrsBgChUeGjZL46/xlJP/e0bqA3Ah8l89H5uVctkkXgo2Q+Oj9j90gWY/gAUAgCHyULedUtEB2Bj5JdLbf3u2U4B0ljDB9wN5ZP4CNpVPgA5+SjEFT4gDF0R6C6R/Ko8IHhTsVuAGCDwAeGezF2AwAbDOkAxpAdgeEcZIEKHwAKQeADQCEIfAAoBIEPGGdiNwDwjcAHDC6+wugR+IDxQ+wGAL4R+IBxIXYDAN8IfMD4LnYDAN8IfAAoBIEPGOdjNwDwjcAHDA7aYvQIfMDgoC1Gj8AHgEIQ+ABQCAIfAApB4ANAIQh8ACgEgQ8AhSDwAaAQBD5grIrdAMA3Ah8wNsVuAOAbgQ8Yl8VuAOAbgQ8YDOlg9Ah8wGDyNIwegQ8Yd8ZuAODbwmQyid0GIAVDdoQFZ60APKLCB4BCEPgAUAgCHxg2nANkg8BH6Qh7FIPAB4BCEPgo2eeO1vOyo/UAXnFaJkrmsvNzaiaSR4UPAIUg8AE3+KmM5BH4KNVpD+sk9JG0S2I3AIjAZzBPxHg+EkWFj9J8EGAbVPpIEmfpoDShOjxVPpJDhY+S7A64rc8CbguwQoWPkoTs7OclXRpwe0ArKnyUInRls1bSPYG3CTSiwkcpYnZ0xvORBCp8lGBr7AYAKSDwUYLbI2//msjbByQxpIMyfC8zph7LS5L2RNw+IIkKH2WIGfaS9KvI2wckEfhACKtjNwCQCHyM30exGyBpTewGABKBj/G7OXYDJF2I3QBAIvCBEAh8JIHAx9hx0ROwhMAH/DsfuwGAROADIRyP3QBA4sIrlGG3pEMRt8+wEpJA4KMUTJ6G4jGkA/j1euwGAFPcxBylWFD4Kp/KHkmhwkdJCGAUjcBHaR4NtB2+XJAcDtqiRL47PWGPJFHho0Sfelw3YY9kEfgo0Y0ywbwg6aDD9RL2SBpDOsCyvjsDQY8sUOEDy7oG95EerwGi4Tx84GIEOEaLCh8ACkHgA0AhCHwAKASBDwCFIPABoBAEPgAUgsAHgEIQ+ABQCAIfAApB4ANAIQh8ACgEgQ8AhSDwAaAQBD4AFILAB4BCEPgAUAgCHwAKQeADQCEIfAAoBIEPAIUg8AGgEAQ+ABSCwAeAQhD4AFAIAh8ACkHgA0AhCHwAKASBDwCFIPABoBAEPgAUgsAHgEIQ+ABQCAIfAApB4ANAIQh8ACgEgQ8AhSDwAaAQBD4AFILAB4BCEPgAUAgCHwAKQeADQCEIfAAoBIEPAIUg8AGgEAQ+ABSCwAeAQhD4AFAIAh8ACkHgA0AhCHwAKASBDwCFIPABoBAEPgAUgsAHgEIQ+ABQCAIfAApB4ANAIQh8ACgEgQ8AhSDwAaAQBD4AFILAB4BCEPgAUAgCHwAKQeADQCEIfAAoBIEPAIUg8AGgEAQ+ABSCwAeAQhD4AFAIAh8ACkHgA0AhCHwAKASBDwCFIPABoBAEPgAUgsAHgEIQ+ABQCAIfAApB4ANAIf4/krshHrMrxNQAAAAASUVORK5CYII=";
+const FIRMA_LOGO = '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';
 
 const FI = { W:660, H:307, R:17, ESCALA:3, ctx:null, canvas:null, logo:null, lista:false };
 
@@ -3232,7 +3330,7 @@ function fiGuardarDiferido(){
 
 const GRAPH_KEY = 'sip_graph_cfg_formatos';
 const DEFAULT_GRAPH_CFG = {
-  clientId : '301142e3-19ee-4d69-9dd9-8e15e564d922',
+  clientId : 'a2093ffe-4c19-4c6c-8fed-3b3079f88741',  /* Formatos Sipnology — registro propio */
   tenantId : '7e4245e5-225d-4ad0-9cf3-276fcc694c15',
   host     : 'sipnologysacv.sharepoint.com',
   sitePath : '/sites/Formatos',
@@ -3251,10 +3349,21 @@ const CARPETAS = {
 
 let _msalApp = null;
 
+/* Client ID heredado: el portal usaba el registro del Cotizador.
+   Formatos ya tiene el suyo propio, así que si alguien conserva el
+   anterior en su navegador lo migramos solo, sin que tenga que
+   restaurar la configuración a mano. */
+const CLIENT_ID_HEREDADO = '301142e3-19ee-4d69-9dd9-8e15e564d922';
+
 function getGraphCfg(){
   try{
     const s = JSON.parse(localStorage.getItem(GRAPH_KEY) || 'null');
-    return (s && s.clientId) ? s : DEFAULT_GRAPH_CFG;
+    if(!s || !s.clientId) return DEFAULT_GRAPH_CFG;
+    if(s.clientId === CLIENT_ID_HEREDADO){
+      s.clientId = DEFAULT_GRAPH_CFG.clientId;
+      try{ localStorage.setItem(GRAPH_KEY, JSON.stringify(s)); }catch(e){}
+    }
+    return s;
   }catch(e){ return DEFAULT_GRAPH_CFG; }
 }
 function setGraphCfg(c){ localStorage.setItem(GRAPH_KEY, JSON.stringify(c)); }
@@ -3273,7 +3382,8 @@ async function graphToken(cfg, opts){
     });
     await _msalApp.initialize();
   }
-  const scopes = ['Sites.ReadWrite.All'];
+  // Mail.Send permite avisar a Administración desde el propio portal
+  const scopes = ['Sites.ReadWrite.All','Mail.Send'];
   let acc = _msalApp.getAllAccounts()[0];
   if(opts.forceLogin){ acc = (await _msalApp.loginPopup({scopes, prompt:'login'})).account; }
   else if(!acc)      { acc = (await _msalApp.loginPopup({scopes})).account; }
@@ -3452,16 +3562,27 @@ function navFilaCarpeta(f){
     <div class="repo-tx"><div class="repo-n">${esc(f.name)}</div></div>
     <span class="repo-go">Abrir ›</span></div>`;
 }
+/* El estado se deduce de la carpeta donde vive el archivo */
+function navEstado(f){
+  const p = (f.parentReference && f.parentReference.path) || NAV.pila.map(x=>x.name).join('/');
+  if(/\/Completas(\/|$)/i.test(p)  || /(^|\/)Completas$/i.test(p))  return 'Completa';
+  if(/\/Pendientes(\/|$)/i.test(p) || /(^|\/)Pendientes$/i.test(p)) return 'Pendiente';
+  return '';
+}
+
 function navFilaArchivo(f, sub){
   const d = f.lastModifiedDateTime ? new Date(f.lastModifiedDateTime) : null;
   const meta = (d ? d.toLocaleDateString('es-MX')+' '+
                  d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '')
              + (sub ? ' · '+sub : '');
+  const est = navEstado(f);
+  const chip = est
+    ? `<span class="repo-chip ${est==='Completa'?'ok':'pend'}">${est}</span>` : '';
   return `<div class="repo-fila">
     <span class="repo-ic arch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
-    <div class="repo-tx"><div class="repo-n">${esc(f.name.replace(/\.json$/i,''))}</div>
+    <div class="repo-tx"><div class="repo-n">${esc(f.name.replace(/\.json$/i,''))}${chip}</div>
       <div class="repo-m">${esc(meta)}</div></div>
     <button class="btn btn-s btn-sm" data-abrir="${esc(f.id)}">Abrir</button></div>`;
 }
@@ -3548,9 +3669,15 @@ async function navAbrirArchivo(itemId){
     if(!id || !FORMATOS[id]) throw new Error('El archivo no corresponde a un formato conocido.');
     $('#ovRepo').classList.remove('on');
     abrirFormato(id, j.datos || {});
-    if(j._meta.folio){ S.folio = j._meta.folio; sincronizarCabecera(); }
+    if(j._meta.folio){ S.folio = j._meta.folio; }
+    S.datos.__meta = j._meta;            // conserva quién entregó y cuándo
+    // Quien abre desde el repositorio ya inició sesión: si está autorizado,
+    // entra directo en modo Administración sin volver a pedir credenciales.
+    if(FORMATOS[id].dosEtapas && typeof esAdmin==='function' && esAdmin()) S.modoAdmin = true;
+    sincronizarCabecera();
     renderForm();
-    toast('Solicitud abierta · '+S.folio, 'ok');
+    const est = j._meta.estado ? ' · '+j._meta.estado : '';
+    toast('Solicitud abierta · '+S.folio+est, 'ok');
   }catch(e){
     toast('No se pudo abrir la solicitud: '+e.message,'err',5500);
   }
@@ -3585,6 +3712,243 @@ function repoConfigRestaurar(){
   toast('Se restauró la configuración predeterminada.','ok');
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   FLUJO DE DOS ETAPAS
+   El solicitante entrega la solicitud y queda en Pendientes.
+   Administración la completa y pasa a Completas.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Correos que pueden completar la parte de Administración.
+   Durante las pruebas es una sola cuenta; se amplía al liberar. */
+const ADMINS_KEY = 'sip_admins_formatos';
+const ADMINS_DEFAULT = ['fernando.fernandez@sipnology.com.mx'];
+
+/* A quién se avisa cuando llega una solicitud nueva */
+const AVISOS_KEY = 'sip_avisos_formatos';
+const AVISOS_DEFAULT = {
+  viaticos : ['fernando.fernandez@sipnology.com.mx'],
+  vuelo    : ['fernando.fernandez@sipnology.com.mx'],
+};
+
+const PENDIENTES = 'Pendientes';
+const COMPLETAS  = 'Completas';
+
+function getAdmins(){
+  try{ const s = JSON.parse(localStorage.getItem(ADMINS_KEY)||'null');
+       return (Array.isArray(s) && s.length) ? s : ADMINS_DEFAULT; }
+  catch(e){ return ADMINS_DEFAULT; }
+}
+function getAvisos(fmtId){
+  try{ const s = JSON.parse(localStorage.getItem(AVISOS_KEY)||'null');
+       const m = (s && typeof s==='object') ? s : AVISOS_DEFAULT;
+       return m[fmtId] || AVISOS_DEFAULT[fmtId] || []; }
+  catch(e){ return AVISOS_DEFAULT[fmtId] || []; }
+}
+
+/* ¿La cuenta con la que se entró puede completar solicitudes? */
+function esAdmin(){
+  const c = cuentaActiva();
+  if(!c) return false;
+  const correo = String(c.username || '').trim().toLowerCase();
+  return getAdmins().some(a => String(a).trim().toLowerCase() === correo);
+}
+
+/* Carpeta destino según el estado */
+function rutaCarpeta(fmtId, estado){
+  const base = CARPETAS[fmtId] || 'Otros';
+  if(!FORMATOS[fmtId] || !FORMATOS[fmtId].dosEtapas) return base;
+  return base + '/' + (estado===COMPLETAS ? COMPLETAS : PENDIENTES);
+}
+
+/* Crea la ruta completa, nivel por nivel */
+async function graphAsegurarRuta(drive, H, ruta){
+  const partes = ruta.split('/').filter(Boolean);
+  let acum = '';
+  for(const p of partes){
+    const padre = acum;
+    acum = acum ? acum+'/'+p : p;
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(acum)}`,
+      {headers:H});
+    if(r.ok) continue;
+    const destino = padre
+      ? `root:/${encodeURIComponent(padre)}:/children`
+      : 'root/children';
+    await fetch(`https://graph.microsoft.com/v1.0/drives/${drive}/${destino}`, {
+      method:'POST',
+      headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+      body:JSON.stringify({name:p, folder:{},
+                           '@microsoft.graph.conflictBehavior':'replace'}),
+    });
+  }
+}
+
+/* Elimina el archivo de Pendientes al pasar a Completas */
+async function graphQuitarDePendientes(drive, H, fmtId, nombre){
+  const ruta = `${CARPETAS[fmtId]}/${PENDIENTES}/${nombre}`;
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(ruta)}`,
+    {headers:H});
+  if(!r.ok) return;
+  const it = await r.json();
+  await fetch(`https://graph.microsoft.com/v1.0/drives/${drive}/items/${it.id}`,
+    {method:'DELETE', headers:H});
+}
+
+/* ── Aviso por correo ──────────────────────────────────────────────
+   Sale a nombre de quien entrega la solicitud, con los datos que
+   Administración necesita para ubicarla sin abrir el archivo.      */
+async function enviarAviso(H, liga){
+  const para = getAvisos(S.fmt.id);
+  if(!para.length) return;
+  const d = S.datos;
+  const cuenta = cuentaActiva();
+  const asunto = `Nueva solicitud ${S.folio} · ${S.fmt.corto}`;
+  const cuerpo = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
+      <p style="margin:0 0 14px">Se registró una solicitud que requiere ser completada
+         por el área de Administración.</p>
+      <table style="border-collapse:collapse;font-size:14px">
+        <tr><td style="padding:4px 14px 4px 0;color:#666">Tipo de solicitud</td>
+            <td style="padding:4px 0"><b>${esc(S.fmt.nombre)}</b></td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666">Solicitante</td>
+            <td style="padding:4px 0"><b>${esc(d.solicitante||'—')}</b></td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666">No. de solicitud</td>
+            <td style="padding:4px 0"><b>${esc(S.folio)}</b></td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666">Fecha</td>
+            <td style="padding:4px 0"><b>${esc(fDate(d.fecha || d.del || hoyISO()))}</b></td></tr>
+      </table>
+      ${liga ? `<p style="margin:18px 0 0"><a href="${esc(liga)}"
+         style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
+         border-radius:8px;display:inline-block;font-weight:600">Abrir la solicitud</a></p>` : ''}
+      <p style="margin:22px 0 0;font-size:12px;color:#888">
+         Enviado automáticamente por el Portal de Formatos de Sipnology
+         ${cuenta ? '· '+esc(cuenta.username||'') : ''}</p>
+    </div>`;
+
+  const r = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method:'POST',
+    headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+    body:JSON.stringify({
+      message:{
+        subject:asunto,
+        body:{contentType:'HTML', content:cuerpo},
+        toRecipients: para.map(a=>({emailAddress:{address:a}})),
+      },
+      saveToSentItems:true,
+    }),
+  });
+  if(!r.ok) throw new Error('aviso HTTP '+r.status);
+}
+
+/* ── Guardado con etapas ───────────────────────────────────────────
+   Devuelve true si el expediente quedó archivado.                   */
+async function repoGuardarEtapa(opts){
+  opts = opts || {};
+  if(!S.fmt) return false;
+  if(!opts.yaValidado && !validar()) return false;
+
+  const cfg = getGraphCfg();
+  if(location.protocol === 'file:'){
+    toast('Guardar en SharePoint requiere abrir el portal desde su dirección '+
+          'publicada (https).','err',6000);
+    return false;
+  }
+
+  const completa = !!(S.fmt.dosEtapas && S.modoAdmin);
+  const estado = completa ? COMPLETAS : PENDIENTES;
+
+  try{
+    const token = await graphToken(cfg);
+    const H = {Authorization:'Bearer '+token};
+    const drive = await graphDrive(cfg, H);
+
+    const carpeta = rutaCarpeta(S.fmt.id, estado);
+    await graphAsegurarRuta(drive, H, carpeta);
+
+    const nombre = nombreArchivo('json');
+    const cuenta = cuentaActiva();
+    const previo = (S.datos.__meta) || {};
+    const payload = {
+      _meta:{
+        formato:S.fmt.id, nombre:S.fmt.nombre, folio:S.folio,
+        fecha:S.datos.fecha || S.datos.del || hoyISO(),
+        version:S.fmt.version,
+        estado: S.fmt.dosEtapas ? (completa ? 'Completa' : 'Pendiente') : 'Entregada',
+        entregadaPor: previo.entregadaPor ||
+                      (cuenta ? (cuenta.username||'') : ''),
+        entregadaEn:  previo.entregadaEn || new Date().toISOString(),
+        completadaPor: completa && cuenta ? (cuenta.username||'') : (previo.completadaPor||''),
+        completadaEn:  completa ? new Date().toISOString() : (previo.completadaEn||''),
+        app:'Portal de Formatos Sipnology v1.2',
+      },
+      datos:S.datos,
+    };
+
+    const ruta = `${carpeta}/${nombre}`;
+    const up = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(ruta)}:/content`,
+      {method:'PUT',
+       headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+       body:JSON.stringify(payload, null, 2)});
+    if(!up.ok) throw new Error('No se pudo subir el archivo (HTTP '+up.status+').');
+    const subido = await up.json().catch(()=>({}));
+
+    // Al completarse, el expediente deja de estar en Pendientes
+    if(completa) await graphQuitarDePendientes(drive, H, S.fmt.id, nombre);
+
+    guardarBorrador();
+    toast(completa
+      ? `Solicitud completada · pasó a ${COMPLETAS}`
+      : `Archivada en SharePoint · ${carpeta}`, 'ok', 5000);
+
+    // El aviso solo va cuando el expediente entra a Pendientes
+    if(!completa && S.fmt.dosEtapas){
+      try{
+        await enviarAviso(H, subido.webUrl || '');
+        toast('Aviso enviado a Administración','ok',3800);
+      }catch(err){
+        console.error(err);
+        toast('La solicitud sí se archivó, pero no salió el aviso por correo. '+
+              'Administración la verá en el resumen diario.','inf',6500);
+      }
+    }
+    return true;
+  }catch(e){
+    console.error(e);
+    const m = /popup|user_cancelled|interaction/i.test(e.message||'')
+      ? 'Se cerró la ventana de inicio de sesión.' : e.message;
+    toast('No se archivó en SharePoint: '+m+' El PDF sí se generará.','err',7000);
+    return false;
+  }
+}
+
+/* ── Entrar en modo Administración ── */
+async function activarModoAdmin(){
+  const cfg = getGraphCfg();
+  if(location.protocol === 'file:'){
+    toast('Completar una solicitud requiere el portal publicado (https).','err',5500);
+    return;
+  }
+  try{
+    await graphToken(cfg);                       // fuerza el inicio de sesión
+    if(!esAdmin()){
+      const c = cuentaActiva();
+      toast(`La cuenta ${c?c.username:''} no está autorizada para completar `+
+            `solicitudes. Contacta a Administración.`,'err',6500);
+      return;
+    }
+    S.modoAdmin = true;
+    renderForm();
+    sincronizarCabecera();
+    toast('Modo Administración activo · ya puedes completar la solicitud','ok',4200);
+    const sec = $$('.f-sec').pop();
+    if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(e){
+    toast('No se pudo iniciar sesión: '+e.message,'err',5500);
+  }
+}
+
 /* ═══════════════════════ APLICACIÓN ═══════════════════════ */
 
 function irInicio(){
@@ -3601,7 +3965,7 @@ function irInicio(){
 function abrirFormato(id, datos){
   const f = FORMATOS[id];
   if(!f) return;
-  S.fmt=f; S.seccion=0;
+  S.fmt=f; S.seccion=0; S.modoAdmin=false;
   S.datos = datos ? JSON.parse(JSON.stringify(datos)) : {};
 
   // Prellenar fechas "hoy"
@@ -3628,7 +3992,9 @@ function abrirFormato(id, datos){
 
 function sincronizarCabecera(){
   $('#tbTitle').textContent = S.fmt.nombre;
-  $('#tbSub').textContent   = `Folio ${S.folio} · Versión ${S.fmt.version}`;
+  const est = (S.datos.__meta && S.datos.__meta.estado) ? ' · '+S.datos.__meta.estado : '';
+  const adm = S.modoAdmin ? ' · modo Administración' : '';
+  $('#tbSub').textContent   = `Folio ${S.folio} · Versión ${S.fmt.version}${est}${adm}`;
 }
 
 /* ── Borradores ── */
@@ -4084,6 +4450,7 @@ function init(){
 
   // Repositorio SharePoint
   $('#btnRepoAbrir').onclick = repoAbrir;
+  $('#btnAdmin').onclick     = activarModoAdmin;
   // Navegación dentro del repositorio
   $('#navAtras').onclick     = navAtras;
   $('#navAdelante').onclick  = navAdelante;
@@ -4113,6 +4480,7 @@ function init(){
   }
 }
 document.addEventListener('DOMContentLoaded', init);
+
 
 </script>
 </body>
