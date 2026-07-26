@@ -663,13 +663,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
-    Exportar JSON</button>
-  <button class="btn btn-s" id="btnRepo" title="Guardar una copia en SharePoint">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round">
-      <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
-      <path d="M12 12v5M9.5 14.5 12 12l2.5 2.5"/></svg>
-    Guardar en SharePoint</button>
+    Guardar Local</button>
   <button class="btn btn-p" id="btnPDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
@@ -789,6 +783,9 @@ capacitacion:{
   color:'#E05C14', colorBg:'#FEF3EC',
   icono:'<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
   version:'01', emision:'JUNIO/2026', paginas:'1 de 1',
+  // El solicitante entrega el expediente completo: al generar el PDF
+  // se archiva la copia en SharePoint automáticamente.
+  subeRepo:1,
   firmas:{ solicitante:'SOLICITANTE',
            autoriza:['Director de Área','Dirección General','Compras'] },
   secciones:[
@@ -885,6 +882,8 @@ licencia:{
   color:'#5B4BC4', colorBg:'#F0EEFB',
   icono:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/>',
   version:'01', emision:'JUNIO/2026', paginas:'2 de 2',
+  // Igual que Capacitación: el PDF y la copia en SharePoint van juntos
+  subeRepo:1,
   saltoPagina:'ti',
   firmas:{ solicitante:'SOLICITANTE',
            autoriza:['Director de Ingeniería','Director General','Compras / Finanzas'] },
@@ -1926,8 +1925,12 @@ function actualizarProgreso(){
   $('#progFill').style.width = pct+'%';
   $('#progPct').textContent = pct+'%';
   $('#progTxt').textContent = `${reqLleno} de ${req} obligatorios`;
+  // Se avisa cuándo el PDF además archiva la copia en SharePoint
+  const archiva = S.fmt.subeRepo
+    ? ` · <span style="color:var(--or-d)">al descargar el PDF se archiva en SharePoint</span>` : '';
   $('#abInfo').innerHTML = `Folio <b>${esc(S.folio)}</b> · ${lleno} de ${tot} campos capturados`+
-    (reqLleno<req ? ` · <span style="color:var(--warn)">faltan ${req-reqLleno} obligatorios</span>` : '');
+    (reqLleno<req ? ` · <span style="color:var(--warn)">faltan ${req-reqLleno} obligatorios</span>`
+                  : archiva);
 }
 
 function actualizarTablas(){
@@ -2861,15 +2864,30 @@ function pdfListo(){
          (pdfMake.vfs || (pdfMake.fonts && Object.keys(pdfMake.fonts).length));
 }
 
-function descargarPDF(){
+async function descargarPDF(){
   if(!validar()) return;
-  if(!pdfListo()){
-    toast('No se pudo cargar el generador de PDF. Abriendo la impresión del navegador — '+
-          'elige "Guardar como PDF".','inf',6000);
-    setTimeout(()=>window.print(), 700);
-    return;
-  }
+
+  const btn = $('#btnPDF');
+  const prev = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; }
+
   try{
+    /* En los formatos que se archivan, la copia a SharePoint va PRIMERO:
+       la ventana de inicio de sesión de Microsoft necesita el gesto del
+       clic, y se perdería si antes generamos el PDF. Si el archivado
+       falla, el PDF se descarga igual. */
+    if(S.fmt.subeRepo && location.protocol!=='file:' && typeof repoGuardar==='function'){
+      if(btn) btn.innerHTML = 'Archivando…';
+      await repoGuardar({yaValidado:true});
+    }
+
+    if(btn) btn.innerHTML = prev;
+    if(!pdfListo()){
+      toast('No se pudo cargar el generador de PDF. Abriendo la impresión del navegador — '+
+            'elige "Guardar como PDF".','inf',6000);
+      setTimeout(()=>window.print(), 700);
+      return;
+    }
     toast('Generando PDF…','inf',1800);
     pdfMake.createPdf(pdfDef()).download(nombreArchivo('pdf'), ()=>{
       confirmarConsecutivo(S.fmt.id, iniciales(S.datos.solicitante),
@@ -2881,6 +2899,8 @@ function descargarPDF(){
     console.error(e);
     toast('Error al generar el PDF. Se abrirá la impresión del navegador.','err',5000);
     setTimeout(()=>window.print(), 700);
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = prev; }
   }
 }
 
@@ -3287,21 +3307,19 @@ async function graphAsegurarCarpeta(drive, H, carpeta){
   });
 }
 
-/* ── Guardar la solicitud actual en el repositorio ── */
-async function repoGuardar(){
-  if(!S.fmt) return;
-  if(!validar()) return;
+/* ── Guardar la solicitud actual en el repositorio ──
+   opts.yaValidado : el llamador ya verificó los campos obligatorios     */
+async function repoGuardar(opts){
+  opts = opts || {};
+  if(!S.fmt) return false;
+  if(!opts.yaValidado && !validar()) return false;
 
   const cfg = getGraphCfg();
   if(location.protocol === 'file:'){
     toast('Guardar en SharePoint requiere abrir el portal desde su dirección publicada (https), '+
           'no como archivo local.','err',6000);
-    return;
+    return false;
   }
-
-  const btn = $('#btnRepo');
-  const textoPrevio = btn ? btn.innerHTML : '';
-  if(btn){ btn.disabled = true; btn.innerHTML = 'Guardando…'; }
 
   try{
     const token = await graphToken(cfg);
@@ -3334,15 +3352,15 @@ async function repoGuardar(){
     if(!up.ok) throw new Error('No se pudo subir el archivo (HTTP '+up.status+').');
 
     guardarBorrador();
-    toast('Guardado en SharePoint · '+carpeta+' / '+nombre, 'ok', 5000);
+    toast('Archivado en SharePoint · '+carpeta+' / '+nombre, 'ok', 5000);
+    return true;
   }catch(e){
     console.error(e);
     const m = /popup|user_cancelled|interaction/i.test(e.message||'')
-      ? 'Se cerró la ventana de inicio de sesión. Inténtalo de nuevo.'
+      ? 'Se cerró la ventana de inicio de sesión.'
       : e.message;
-    toast('No se pudo guardar en SharePoint: '+m, 'err', 6500);
-  }finally{
-    if(btn){ btn.disabled = false; btn.innerHTML = textoPrevio; }
+    toast('No se archivó en SharePoint: '+m+' El PDF sí se generará.', 'err', 7000);
+    return false;
   }
 }
 
@@ -4062,7 +4080,6 @@ function init(){
   $$('[data-import]').forEach(b=> b.onclick = ()=> $('#fileJSON').click());
 
   // Repositorio SharePoint
-  $('#btnRepo').onclick      = repoGuardar;
   $('#btnRepoAbrir').onclick = repoAbrir;
   // Navegación dentro del repositorio
   $('#navAtras').onclick     = navAtras;
