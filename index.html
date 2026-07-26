@@ -1147,8 +1147,10 @@ viaticos:{
          cond:{k:'hospedaje', igual:'Sí'}},
         {k:'hospAl',    l:'Hospedaje — Al',       tipo:'date',  w:4,
          cond:{k:'hospedaje', igual:'Sí'}},
-        {k:'noches',    l:'N.° de Noches',        tipo:'entero',w:4, min:0,
-         cond:{k:'hospedaje', igual:'Sí'}},
+        {k:'noches',    l:'N.° de Noches',        tipo:'noches',w:4,
+         desde:'hospDel', hasta:'hospAl',
+         cond:{k:'hospedaje', igual:'Sí'},
+         hint:'Se calcula solo a partir de las fechas de entrada y salida.'},
         {k:'obsHosp',   l:'Observaciones',        tipo:'text',  w:12, ph:'Incluye desayuno',
          cond:{k:'hospedaje', igual:'Sí'}},
 
@@ -1161,7 +1163,8 @@ viaticos:{
            {k:'ciudad',  l:'Ciudad de Hospedaje', tipo:'text',  w:6},
            {k:'del',     l:'Hospedaje — Del',     tipo:'date',  w:4},
            {k:'al',      l:'Hospedaje — Al',      tipo:'date',  w:4},
-           {k:'noches',  l:'N.° de Noches',       tipo:'entero',w:4},
+           {k:'noches',  l:'N.° de Noches',       tipo:'noches',w:4,
+            desde:'del', hasta:'al'},
            {k:'obs',     l:'Observaciones',       tipo:'text',  w:12, ph:'Incluye desayuno'},
          ]},
       ]},
@@ -1284,8 +1287,10 @@ vuelo:{
          cond:{k:'hospedaje', igual:'Sí'}},
         {k:'hospAl',     l:'Hospedaje — Al',          tipo:'date',  w:4,
          cond:{k:'hospedaje', igual:'Sí'}},
-        {k:'noches',     l:'N.° de Noches',           tipo:'entero',w:4, min:0,
-         cond:{k:'hospedaje', igual:'Sí'}},
+        {k:'noches',     l:'N.° de Noches',           tipo:'noches',w:4,
+         desde:'hospDel', hasta:'hospAl',
+         cond:{k:'hospedaje', igual:'Sí'},
+         hint:'Se calcula solo a partir de las fechas de entrada y salida.'},
         {k:'obsHosp',    l:'Observaciones de Hospedaje / Dirección de la sede',
          tipo:'area', w:12, rows:2, cond:{k:'hospedaje', igual:'Sí'},
          ph:'Indica la dirección del sitio a visitar para reservar el hotel más cercano'},
@@ -1299,7 +1304,8 @@ vuelo:{
            {k:'ciudad',  l:'Ciudad',                   tipo:'text',  w:6},
            {k:'del',     l:'Hospedaje — Del',          tipo:'date',  w:4},
            {k:'al',      l:'Hospedaje — Al',           tipo:'date',  w:4},
-           {k:'noches',  l:'N.° de Noches',            tipo:'entero',w:4},
+           {k:'noches',  l:'N.° de Noches',            tipo:'noches',w:4,
+            desde:'del', hasta:'al'},
            {k:'obs',     l:'Observaciones / Dirección de la sede', tipo:'text', w:12},
          ]},
       ]},
@@ -1685,7 +1691,53 @@ function camposVisibles(sec){
 }
 /* ¿Es un campo que el usuario captura? (los derivados no cuentan) */
 function esCapturable(c){
-  return c.k && !['tabla','lista','calc','bloques'].includes(c.tipo);
+  return c.k && !['tabla','lista','calc','bloques','noches'].includes(c.tipo);
+}
+
+/* ── Noches de hospedaje ───────────────────────────────────────────
+   Contar noches a mano es donde más se equivoca la gente: se cuentan
+   los días en vez de las noches, o se olvida que el check-out no paga.
+   Las noches son la diferencia de días entre entrada y salida.        */
+function noches(desde, hasta){
+  if(!desde || !hasta) return null;
+  const a = Date.parse(desde + 'T00:00:00');
+  const b = Date.parse(hasta + 'T00:00:00');
+  if(isNaN(a) || isNaN(b)) return null;
+  const dias = Math.round((b - a) / 86400000);
+  return dias < 0 ? null : dias;      // salida antes de entrada: dato inválido
+}
+
+/* Escribe el resultado en los datos para que llegue al PDF y al JSON,
+   y refresca la casilla en pantalla si está visible. */
+function sincronizarNoches(){
+  if(!S.fmt) return;
+  const poner = (el, n) => {
+    if(!el) return;
+    el.value = (n===null || n===undefined) ? '' : String(n);
+  };
+
+  S.fmt.secciones.forEach(s => s.campos.forEach(c => {
+
+    if(c.tipo === 'noches'){
+      const n = noches(S.datos[c.desde], S.datos[c.hasta]);
+      if(n === null) delete S.datos[c.k]; else S.datos[c.k] = n;
+      poner($(`[data-nfld="${c.k}"]`), n);
+    }
+
+    // Los hospedajes adicionales llevan su propio par de fechas
+    if(c.tipo === 'bloques' && Array.isArray(S.datos[c.k])){
+      const sub = c.campos.filter(x => x.tipo === 'noches');
+      if(!sub.length) return;
+      S.datos[c.k].forEach((rv, i) => {
+        if(!rv) return;
+        sub.forEach(x => {
+          const n = noches(rv[x.desde], rv[x.hasta]);
+          if(n === null) delete rv[x.k]; else rv[x.k] = n;
+          poner($(`[data-nblk="${c.k}"][data-nbi="${i}"][data-nbc="${x.k}"]`), n);
+        });
+      });
+    }
+  }));
 }
 /* Cuenta de campos capturables de una sección (solo visibles) */
 function conteoSeccion(sec){
@@ -1768,6 +1820,17 @@ function campoHTML(c){
         </div>`;
       break;
     }
+    /* Noches: se derivan de las fechas, no se capturan */
+    case 'noches': {
+      const n = noches(S.datos[c.desde], S.datos[c.hasta]);
+      inp = `<input type="text" id="f_${c.k}" data-nfld="${c.k}" readonly tabindex="-1"
+        value="${n===null?'':n}" placeholder="—"
+        style="text-align:right;font-variant-numeric:tabular-nums;
+               background:var(--or-soft);border-color:var(--or-l);color:var(--or-d);
+               font-weight:650;cursor:default">`;
+      break;
+    }
+
     case 'area':
       inp = `<textarea id="f_${c.k}" data-k="${c.k}" rows="${c.rows||3}"
         placeholder="${esc(c.ph||'')}">${esc(v)}</textarea>`; break;
@@ -1813,7 +1876,14 @@ function campoHTML(c){
         placeholder="${esc(c.ph||'')}"${c.ro?' readonly':''}>`;
   }
 
-  const hint = c.hint ? `<div class="hint">${esc(c.hint)}</div>` : '';
+  /* Fechas al revés: el campo se queda vacío, y sin explicación parece
+     que el portal falló. Mejor decir cuál es el problema. */
+  let hint = c.hint ? `<div class="hint">${esc(c.hint)}</div>` : '';
+  if(c.tipo==='noches' && S.datos[c.desde] && S.datos[c.hasta] &&
+     noches(S.datos[c.desde], S.datos[c.hasta]) === null){
+    hint = `<div class="hint" style="color:var(--warn)">La fecha de salida es anterior `+
+           `a la de entrada.</div>`;
+  }
   return `<div class="fld w${c.w||6}">${lbl}${inp}${hint}</div>`;
 }
 
@@ -1929,6 +1999,16 @@ function campoBloqueHTML(bk, bi, c, rv){
         `</select>`; break;
     case 'date': inp = `<input type="date" id="${id}" ${attrs} value="${esc(v)}">`; break;
     case 'time': inp = `<input type="time" id="${id}" ${attrs} value="${esc(v)}">`; break;
+    case 'noches': {
+      const n = noches(rv[c.desde], rv[c.hasta]);
+      inp = `<input type="text" id="${id}" readonly tabindex="-1"
+        data-nblk="${bk}" data-nbi="${bi}" data-nbc="${c.k}"
+        value="${n===null?'':n}" placeholder="—"
+        style="text-align:right;font-variant-numeric:tabular-nums;
+               background:var(--or-soft);border-color:var(--or-l);color:var(--or-d);
+               font-weight:650;cursor:default">`;
+      break;
+    }
     case 'entero':
       inp = `<input type="text" inputmode="numeric" id="${id}" ${attrs} data-entero="1"
         value="${esc(v)}" placeholder="${esc(c.ph||'0')}">`; break;
@@ -1975,6 +2055,9 @@ function bloquesHTML(c){
 }
 
 function renderForm(){
+  /* Antes de pintar nada: si llega una solicitud vieja con las noches
+     mal contadas, se corrigen contra sus propias fechas. */
+  sincronizarNoches();
   const vis = seccionesVisibles();
 
   // Nav lateral — numeración correlativa sobre las secciones visibles
@@ -4315,6 +4398,7 @@ function setValor(k, v){
 /* Refresca en pantalla los campos derivados (p. ej. Costo Total Estimado) */
 function refrescarCalculados(){
   if(!S.fmt) return;
+  sincronizarNoches();          // las noches también son un dato derivado
   S.fmt.secciones.forEach(s=>s.campos.forEach(c=>{
     if(c.tipo!=='calc') return;
     const el = $(`[data-calcfld="${c.k}"]`);
@@ -4378,6 +4462,7 @@ function despachar(t){
     if(!Array.isArray(S.datos[d.bk])) S.datos[d.bk] = [];
     S.datos[d.bk][d.bi] = S.datos[d.bk][d.bi] || {};
     S.datos[d.bk][d.bi][d.bc] = t.value;
+    refrescarCalculados();      // p. ej. las noches del hospedaje adicional
   } else return;
 
   renderPreview();
