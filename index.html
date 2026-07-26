@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js"></script>
 <style>
 :root{
   --or:#E05C14; --or-l:#FAD7C2; --or-d:#B34A10; --or-soft:#FEF3EC;
@@ -456,6 +457,16 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
         stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       Importar</button>
+    <button class="btn btn-g btn-sm" id="btnRepoAbrir" title="Abrir una solicitud del repositorio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
+      Repositorio</button>
+    <button class="btn btn-g btn-sm btn-ic" id="btnCfg" title="Configurar el repositorio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </button>
     <button class="btn btn-s btn-sm" id="btnHome">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
@@ -627,6 +638,12 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
     Exportar JSON</button>
+  <button class="btn btn-s" id="btnRepo" title="Guardar una copia en SharePoint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
+      <path d="M12 12v5M9.5 14.5 12 12l2.5 2.5"/></svg>
+    Guardar en SharePoint</button>
   <button class="btn btn-p" id="btnPDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
@@ -636,6 +653,42 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 
 <input type="file" id="fileJSON" accept=".json,application/json" style="display:none">
 <div class="toasts" id="toasts"></div>
+
+<!-- ══════════════ REPOSITORIO ══════════════ -->
+<div class="ov" id="ovRepo">
+  <div class="modal" style="max-width:560px">
+    <h3>Solicitudes en el repositorio</h3>
+    <p>Guardadas en SharePoint. Selecciona una para abrirla en el portal.</p>
+    <div id="repoLista" style="max-height:360px;overflow-y:auto;margin-bottom:18px"></div>
+    <div class="modal-a"><button class="btn btn-s" data-cerrar="ovRepo">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- ══════════════ CONFIGURACIÓN DEL REPOSITORIO ══════════════ -->
+<div class="ov" id="ovCfg">
+  <div class="modal" style="max-width:520px">
+    <h3>Configuración del repositorio</h3>
+    <p>Destino en SharePoint donde se guardan las solicitudes. Normalmente no hace falta
+       cambiar nada.</p>
+    <div class="f-grid" style="margin-bottom:18px">
+      <div class="fld w6"><label for="gc_client">Client ID (Entra ID)</label>
+        <input type="text" id="gc_client"></div>
+      <div class="fld w6"><label for="gc_tenant">Tenant ID</label>
+        <input type="text" id="gc_tenant"></div>
+      <div class="fld w12"><label for="gc_host">Host de SharePoint</label>
+        <input type="text" id="gc_host" placeholder="contoso.sharepoint.com"></div>
+      <div class="fld w6"><label for="gc_site">Ruta del sitio</label>
+        <input type="text" id="gc_site" placeholder="/sites/Formatos"></div>
+      <div class="fld w6"><label for="gc_lib">Biblioteca</label>
+        <input type="text" id="gc_lib" placeholder="Solicitudes"></div>
+    </div>
+    <div class="modal-a">
+      <button class="btn btn-g" id="cfgRestaurar">Restaurar</button>
+      <button class="btn btn-s" data-cerrar="ovCfg">Cancelar</button>
+      <button class="btn btn-p" id="cfgGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════ MODAL ══════════════ -->
 <div class="ov" id="ovNueva">
@@ -3094,6 +3147,252 @@ function fiGuardarDiferido(){
   _fgTimer = setTimeout(guardarFirma, 700);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   REPOSITORIO M365 · SharePoint vía Microsoft Graph / Entra ID
+   Mismo esquema que el Cotizador: el usuario entra con su cuenta de
+   Microsoft 365 y el acceso queda limitado a la organización.
+   No hay tokens en el código: MSAL los obtiene al iniciar sesión.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const GRAPH_KEY = 'sip_graph_cfg_formatos';
+const DEFAULT_GRAPH_CFG = {
+  clientId : '301142e3-19ee-4d69-9dd9-8e15e564d922',
+  tenantId : '7e4245e5-225d-4ad0-9cf3-276fcc694c15',
+  host     : 'sipnologysacv.sharepoint.com',
+  sitePath : '/sites/Formatos',
+  library  : 'Solicitudes',
+};
+
+/* Carpeta destino según el formato: evita que todo caiga en la raíz */
+const CARPETAS = {
+  capacitacion : 'Capacitacion',
+  licencia     : 'Licencia',
+  viaticos     : 'Viaticos',
+  vuelo        : 'Vuelo y Hospedaje',
+  responsiva   : 'Carta Responsiva',
+};
+
+let _msalApp = null;
+
+function getGraphCfg(){
+  try{
+    const s = JSON.parse(localStorage.getItem(GRAPH_KEY) || 'null');
+    return (s && s.clientId) ? s : DEFAULT_GRAPH_CFG;
+  }catch(e){ return DEFAULT_GRAPH_CFG; }
+}
+function setGraphCfg(c){ localStorage.setItem(GRAPH_KEY, JSON.stringify(c)); }
+
+/* ── Token de acceso mediante Entra ID ── */
+async function graphToken(cfg, opts){
+  opts = opts || {};
+  if(typeof msal === 'undefined')
+    throw new Error('No se pudo cargar la librería de Microsoft (MSAL). Revisa tu conexión.');
+  if(!_msalApp){
+    _msalApp = new msal.PublicClientApplication({
+      auth:{ clientId:cfg.clientId,
+             authority:'https://login.microsoftonline.com/'+cfg.tenantId,
+             redirectUri: location.origin + location.pathname },
+      cache:{ cacheLocation:'localStorage' },
+    });
+    await _msalApp.initialize();
+  }
+  const scopes = ['Sites.ReadWrite.All'];
+  let acc = _msalApp.getAllAccounts()[0];
+  if(opts.forceLogin){ acc = (await _msalApp.loginPopup({scopes, prompt:'login'})).account; }
+  else if(!acc)      { acc = (await _msalApp.loginPopup({scopes})).account; }
+  try{ return (await _msalApp.acquireTokenSilent({scopes, account:acc})).accessToken; }
+  catch(e){ return (await _msalApp.acquireTokenPopup({scopes})).accessToken; }
+}
+
+function cuentaActiva(){
+  try{ return _msalApp ? (_msalApp.getAllAccounts()[0] || null) : null; }catch(e){ return null; }
+}
+
+/* ── Localiza la biblioteca de documentos del sitio ── */
+async function graphDrive(cfg, H){
+  const site = await (await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${cfg.host}:${cfg.sitePath}`, {headers:H})).json();
+  if(!site.id) throw new Error('No se encontró el sitio de SharePoint.');
+  const drv = await (await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${site.id}/drives`, {headers:H})).json();
+  const drive = (drv.value||[]).find(d=>d.name===cfg.library) || (drv.value||[])[0];
+  if(!drive) throw new Error('No se encontró la biblioteca "'+cfg.library+'".');
+  return drive.id;
+}
+
+/* Crea la carpeta si no existe; si ya está, no hace nada */
+async function graphAsegurarCarpeta(drive, H, carpeta){
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(carpeta)}`,
+    {headers:H});
+  if(r.ok) return;
+  await fetch(`https://graph.microsoft.com/v1.0/drives/${drive}/root/children`, {
+    method:'POST',
+    headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+    body:JSON.stringify({name:carpeta, folder:{}, '@microsoft.graph.conflictBehavior':'replace'}),
+  });
+}
+
+/* ── Guardar la solicitud actual en el repositorio ── */
+async function repoGuardar(){
+  if(!S.fmt) return;
+  if(!validar()) return;
+
+  const cfg = getGraphCfg();
+  if(location.protocol === 'file:'){
+    toast('Guardar en SharePoint requiere abrir el portal desde su dirección publicada (https), '+
+          'no como archivo local.','err',6000);
+    return;
+  }
+
+  const btn = $('#btnRepo');
+  const textoPrevio = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = 'Guardando…'; }
+
+  try{
+    const token = await graphToken(cfg);
+    const H = {Authorization:'Bearer '+token};
+    const drive = await graphDrive(cfg, H);
+
+    const carpeta = CARPETAS[S.fmt.id] || 'Otros';
+    await graphAsegurarCarpeta(drive, H, carpeta);
+
+    const nombre = nombreArchivo('json');
+    const ruta = `${carpeta}/${nombre}`;
+    const cuenta = cuentaActiva();
+    const payload = {
+      _meta:{
+        formato:S.fmt.id, nombre:S.fmt.nombre, folio:S.folio,
+        fecha:S.datos.fecha || S.datos.del || hoyISO(),
+        version:S.fmt.version,
+        guardadoPor: cuenta ? (cuenta.username || cuenta.name || '') : '',
+        guardadoEn: new Date().toISOString(),
+        app:'Portal de Formatos Sipnology v1.1',
+      },
+      datos:S.datos,
+    };
+
+    const up = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(ruta)}:/content`,
+      {method:'PUT',
+       headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+       body:JSON.stringify(payload, null, 2)});
+    if(!up.ok) throw new Error('No se pudo subir el archivo (HTTP '+up.status+').');
+
+    guardarBorrador();
+    toast('Guardado en SharePoint · '+carpeta+' / '+nombre, 'ok', 5000);
+  }catch(e){
+    console.error(e);
+    const m = /popup|user_cancelled|interaction/i.test(e.message||'')
+      ? 'Se cerró la ventana de inicio de sesión. Inténtalo de nuevo.'
+      : e.message;
+    toast('No se pudo guardar en SharePoint: '+m, 'err', 6500);
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = textoPrevio; }
+  }
+}
+
+/* ── Abrir una solicitud guardada ── */
+async function repoAbrir(){
+  const cfg = getGraphCfg();
+  if(location.protocol === 'file:'){
+    toast('Abrir desde SharePoint requiere el portal publicado (https).','err',5500);
+    return;
+  }
+  try{
+    toast('Consultando el repositorio…','inf',2000);
+    const token = await graphToken(cfg);
+    const H = {Authorization:'Bearer '+token};
+    const drive = await graphDrive(cfg, H);
+
+    // Se listan los JSON de todas las carpetas de formatos
+    const items = [];
+    for(const [id, carpeta] of Object.entries(CARPETAS)){
+      const r = await fetch(
+        `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(carpeta)}:/children`+
+        `?$top=999&$select=id,name,lastModifiedDateTime`, {headers:H});
+      if(!r.ok) continue;
+      const j = await r.json();
+      (j.value||[]).filter(x=>/\.json$/i.test(x.name))
+        .forEach(x=>items.push({id:x.id, name:x.name, carpeta, fmt:id,
+                                fecha:x.lastModifiedDateTime}));
+    }
+    if(!items.length){ toast('Todavía no hay solicitudes guardadas en el repositorio.','inf',4500); return; }
+    items.sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
+    mostrarRepo(items, drive, H);
+  }catch(e){
+    console.error(e);
+    toast('No se pudo consultar el repositorio: '+e.message,'err',6000);
+  }
+}
+
+function mostrarRepo(items, drive, H){
+  const filas = items.map(it=>{
+    const F = FORMATOS[it.fmt];
+    const d = new Date(it.fecha);
+    return `<div class="draft-row" data-repoid="${esc(it.id)}">
+      <div class="draft-ic" style="background:${F?F.colorBg:'#EEE'};color:${F?F.color:'#666'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+          stroke-linecap="round" stroke-linejoin="round">${F?F.icono:''}</svg></div>
+      <div class="draft-b">
+        <div class="draft-t">${esc(it.name.replace(/\.json$/i,''))}</div>
+        <div class="draft-m">${esc(it.carpeta)} · ${d.toLocaleDateString('es-MX')}
+          ${d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div></div>`;
+  }).join('');
+
+  $('#repoLista').innerHTML = filas;
+  $('#ovRepo').classList.add('on');
+  $('#repoLista').onclick = async e=>{
+    const row = e.target.closest('[data-repoid]');
+    if(!row) return;
+    try{
+      const r = await fetch(
+        `https://graph.microsoft.com/v1.0/drives/${drive}/items/${row.dataset.repoid}/content`,
+        {headers:H});
+      const j = await r.json();
+      const id = j._meta && j._meta.formato;
+      if(!id || !FORMATOS[id]) throw new Error('El archivo no corresponde a un formato conocido.');
+      $('#ovRepo').classList.remove('on');
+      abrirFormato(id, j.datos || {});
+      if(j._meta.folio){ S.folio = j._meta.folio; sincronizarCabecera(); }
+      renderForm();
+      toast('Solicitud cargada · '+S.folio,'ok');
+    }catch(err){
+      toast('No se pudo abrir la solicitud: '+err.message,'err',5500);
+    }
+  };
+}
+
+/* ── Configuración del repositorio ── */
+function repoConfig(){
+  const c = getGraphCfg();
+  $('#gc_client').value  = c.clientId || '';
+  $('#gc_tenant').value  = c.tenantId || '';
+  $('#gc_host').value    = c.host     || '';
+  $('#gc_site').value    = c.sitePath || '';
+  $('#gc_lib').value     = c.library  || '';
+  $('#ovCfg').classList.add('on');
+}
+function repoConfigGuardar(){
+  setGraphCfg({
+    clientId:$('#gc_client').value.trim(),
+    tenantId:$('#gc_tenant').value.trim(),
+    host:$('#gc_host').value.trim(),
+    sitePath:$('#gc_site').value.trim(),
+    library:($('#gc_lib').value.trim() || 'Documentos'),
+  });
+  _msalApp = null;                  // fuerza reconstruir la sesión con la nueva configuración
+  $('#ovCfg').classList.remove('on');
+  toast('Configuración del repositorio guardada.','ok');
+}
+function repoConfigRestaurar(){
+  localStorage.removeItem(GRAPH_KEY);
+  _msalApp = null;
+  repoConfig();
+  toast('Se restauró la configuración predeterminada.','ok');
+}
+
 /* ═══════════════════════ APLICACIÓN ═══════════════════════ */
 
 function irInicio(){
@@ -3591,12 +3890,23 @@ function init(){
                                    e.target.value=''; };
   $$('[data-import]').forEach(b=> b.onclick = ()=> $('#fileJSON').click());
 
+  // Repositorio SharePoint
+  $('#btnRepo').onclick      = repoGuardar;
+  $('#btnRepoAbrir').onclick = repoAbrir;
+  $('#btnCfg').onclick       = repoConfig;
+  $('#cfgGuardar').onclick   = repoConfigGuardar;
+  $('#cfgRestaurar').onclick = repoConfigRestaurar;
+  $$('[data-cerrar]').forEach(b=>
+    b.onclick = ()=> $('#'+b.dataset.cerrar).classList.remove('on'));
+  $$('.ov').forEach(ov=>
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('on'); }));
+
   new ResizeObserver(pedirZoom).observe($('.pv-scroll'));
 
   document.addEventListener('keydown', e=>{
     if((e.ctrlKey||e.metaKey) && e.key==='s'){ e.preventDefault();
       if(S.fmt) descargarPDF(); }
-    if(e.key==='Escape') $('#ovNueva').classList.remove('on');
+    if(e.key==='Escape') $$('.ov').forEach(o=>o.classList.remove('on'));
   });
 
   if(!pdfListo()){
