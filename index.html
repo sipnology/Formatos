@@ -64,7 +64,10 @@ a{color:var(--or);text-decoration:none}
 .btn-g:hover{background:rgba(0,0,0,.045);color:var(--ink)}
 .btn-sm{height:31px;padding:0 11px;font-size:12.5px;border-radius:8px}
 .btn-sm svg{width:13px;height:13px}
-.btn:disabled{opacity:.45;pointer-events:none}
+/* El botón sigue recibiendo el puntero para que se lea su title:
+   un botón apagado sin explicación es lo que más confunde. */
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled > *{pointer-events:none}
 .btn-ic{width:36px;padding:0}
 .btn-ic.btn-sm{width:31px}
 
@@ -679,11 +682,17 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       <rect x="3" y="11" width="18" height="11" rx="2"/>
       <path d="M7 11V7a5 5 0 0110 0v4"/></svg>
     Completar como Administración</button>
+  <button class="btn btn-p" id="btnEnviar" style="display:none"
+          title="Archiva la solicitud en Pendientes y avisa a Administración">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+    Enviar a Administración</button>
   <button class="btn btn-p" id="btnPDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-    Descargar PDF</button>
+    <span id="btnPDFTxt">Descargar PDF</span></button>
 </div>
 
 <input type="file" id="fileJSON" accept=".json,application/json" style="display:none">
@@ -2014,10 +2023,15 @@ function actualizarProgreso(){
   $('#progTxt').textContent = `${reqLleno} de ${req} obligatorios`;
   // Se avisa qué hará el botón de PDF según el formato y la etapa
   let nota = '';
-  if(S.fmt.dosEtapas){
+  if(S.fmt.subeRepo && location.protocol === 'file:'){
+    /* Archivo abierto desde el disco: no habrá archivado ni aviso.
+       Conviene decirlo antes de llenar todo, no al final. */
+    nota = ` · <span style="color:var(--warn)">copia local · no se archiva ni avisa a `+
+           `Administración. Usa el portal publicado.</span>`;
+  }else if(S.fmt.dosEtapas){
     nota = S.modoAdmin
-      ? ` · <span style="color:var(--ok)">modo Administración · al descargar pasa a Completas</span>`
-      : ` · <span style="color:var(--or-d)">al descargar queda en Pendientes y se avisa a Administración</span>`;
+      ? ` · <span style="color:var(--ok)">modo Administración · al completar pasa a Completas y el PDF va al solicitante</span>`
+      : ` · <span style="color:var(--or-d)">al enviarla queda en Pendientes; el PDF lo genera Administración</span>`;
   }else if(S.fmt.subeRepo){
     nota = ` · <span style="color:var(--or-d)">al descargar el PDF se archiva en SharePoint</span>`;
   }
@@ -2025,9 +2039,37 @@ function actualizarProgreso(){
     (reqLleno<req ? ` · <span style="color:var(--warn)">faltan ${req-reqLleno} obligatorios</span>`
                   : nota);
 
-  // El botón de Administración solo aparece en los formatos de dos etapas
+  sincronizarBotones();
+}
+
+/* Los formatos de dos etapas tienen dos caminos distintos y excluyentes:
+   el solicitante entrega, Administración completa y descarga. Mostrar
+   los dos botones activos al mismo tiempo invita a bajar un PDF a medias. */
+function sincronizarBotones(){
+  const dos   = !!S.fmt.dosEtapas;
+  const admin = !!S.modoAdmin;
+
   const bAdm = $('#btnAdmin');
-  if(bAdm) bAdm.style.display = (S.fmt.dosEtapas && !S.modoAdmin) ? '' : 'none';
+  if(bAdm) bAdm.style.display = (dos && !admin) ? '' : 'none';
+
+  const bEnv = $('#btnEnviar');
+  if(bEnv) bEnv.style.display = (dos && !admin) ? '' : 'none';
+
+  const bPDF = $('#btnPDF');
+  if(!bPDF) return;
+  const txt = $('#btnPDFTxt');
+
+  if(dos && !admin){
+    bPDF.disabled = true;
+    bPDF.classList.remove('btn-p'); bPDF.classList.add('btn-s');
+    bPDF.title = 'Disponible cuando Administración complete la solicitud';
+    if(txt) txt.textContent = 'Descargar PDF';
+  }else{
+    bPDF.disabled = false;
+    bPDF.classList.remove('btn-s'); bPDF.classList.add('btn-p');
+    bPDF.title = '';
+    if(txt) txt.textContent = (dos && admin) ? 'Completar y descargar PDF' : 'Descargar PDF';
+  }
 }
 
 function actualizarTablas(){
@@ -2961,7 +3003,23 @@ function pdfListo(){
          (pdfMake.vfs || (pdfMake.fonts && Object.keys(pdfMake.fonts).length));
 }
 
+/* Convierte el PDF ya armado en base64, para adjuntarlo al correo */
+function pdfBase64(){
+  return new Promise((ok, fallo)=>{
+    try{ pdfMake.createPdf(pdfDef()).getBase64(b => ok(b)); }
+    catch(e){ fallo(e); }
+  });
+}
+
 async function descargarPDF(){
+  /* En los formatos de dos etapas el PDF no existe hasta que
+     Administración captura montos y transporte reales. Antes de eso
+     sería un documento incompleto circulando como si fuera el bueno. */
+  if(S.fmt.dosEtapas && !S.modoAdmin){
+    toast('El PDF se genera cuando Administración complete la solicitud. '+
+          'Usa "Enviar a Administración" para entregarla.','inf',6000);
+    return;
+  }
   if(!validar()) return;
 
   const btn = $('#btnPDF');
@@ -2973,12 +3031,44 @@ async function descargarPDF(){
        la ventana de inicio de sesión de Microsoft necesita el gesto del
        clic, y se perdería si antes generamos el PDF. Si el archivado
        falla, el PDF se descarga igual. */
-    if(S.fmt.subeRepo && location.protocol!=='file:'){
-      if(btn) btn.innerHTML = 'Archivando…';
-      // Los formatos de dos etapas usan el flujo Pendientes / Completas
-      await (S.fmt.dosEtapas
-        ? repoGuardarEtapa({yaValidado:true})
-        : repoGuardar({yaValidado:true}));
+    if(S.fmt.subeRepo){
+      if(location.protocol === 'file:'){
+        /* Abierto con doble clic desde el disco: el navegador bloquea el
+           inicio de sesión de Microsoft, así que no hay archivado ni aviso.
+           Se avisa en voz alta; antes esto pasaba en silencio y parecía
+           que la solicitud había quedado entregada. */
+        toast('Este PDF NO se archivó ni se avisó a Administración: abriste el '+
+              'portal desde un archivo local. Usa '+
+              'sipnology.github.io/Formatos para que la solicitud cuente.',
+              'err', 9000);
+      }else if(S.fmt.dosEtapas){
+        /* Cierre de Administración: se archiva en Completas y, con la
+           sesión ya abierta, el PDF definitivo regresa al solicitante. */
+        if(btn) btn.innerHTML = 'Completando…';
+        await repoGuardarEtapa({
+          yaValidado:true,
+          alCompletar: async (H, subido) => {
+            if(!pdfListo()) return;
+            if(btn) btn.innerHTML = 'Enviando al solicitante…';
+            try{
+              const b64 = await pdfBase64();
+              const r = await enviarCierre(H, subido.webUrl || '', b64,
+                                           nombreArchivo('pdf'));
+              toast(r.enviado
+                ? 'PDF enviado a '+r.para
+                : 'No se envió el PDF al solicitante: '+r.motivo+'.',
+                r.enviado ? 'ok' : 'inf', 5500);
+            }catch(err){
+              console.error(err);
+              toast('La solicitud quedó completada, pero no salió el correo '+
+                    'con el PDF al solicitante.','inf',6500);
+            }
+          },
+        });
+      }else{
+        if(btn) btn.innerHTML = 'Archivando…';
+        await repoGuardar({yaValidado:true});
+      }
     }
 
     if(btn) btn.innerHTML = prev;
@@ -3043,6 +3133,9 @@ function importarJSON(file){
         const n = parseInt(String(j._meta.folio).split('-').pop(),10);
         if(!isNaN(n)) S.datos.__consec = n;
       }
+      // Sin esto se pierde quién entregó, y el PDF final no sabría a
+      // quién regresar cuando Administración cierre la solicitud.
+      S.datos.__meta = j._meta;
       sincronizarCabecera();
       renderForm();
       toast('Solicitud importada · '+S.folio,'ok');
@@ -3841,6 +3934,65 @@ async function enviarAviso(H, liga){
   if(!r.ok) throw new Error('aviso HTTP '+r.status);
 }
 
+/* ── Correo de cierre al solicitante ───────────────────────────────
+   Cuando Administración termina, el expediente vuelve a quien lo pidió
+   con el PDF definitivo adjunto. Así nadie tiene que acordarse de
+   reenviarlo a mano.                                                */
+function correoDelSolicitante(){
+  const previo = (S.datos.__meta) || {};
+  // Se toma el primero que de verdad parezca correo, no el primero que exista
+  return [previo.entregadaPor, S.datos.correo]
+    .map(c => String(c || '').trim())
+    .find(c => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) || '';
+}
+
+async function enviarCierre(H, liga, pdfB64, nombrePdf){
+  const para = correoDelSolicitante();
+  if(!para) return { enviado:false, motivo:'no se conoce el correo del solicitante' };
+
+  const d = S.datos;
+  const cuerpo = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
+      <p style="margin:0 0 14px">Administración terminó de procesar tu solicitud.
+         El documento definitivo va adjunto a este correo.</p>
+      <table style="border-collapse:collapse;font-size:14px">
+        <tr><td style="padding:4px 14px 4px 0;color:#666">Tipo de solicitud</td>
+            <td style="padding:4px 0"><b>${esc(S.fmt.nombre)}</b></td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666">No. de solicitud</td>
+            <td style="padding:4px 0"><b>${esc(S.folio)}</b></td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666">Fecha</td>
+            <td style="padding:4px 0"><b>${esc(fDate(d.fecha || d.del || hoyISO()))}</b></td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666">Estado</td>
+            <td style="padding:4px 0"><b style="color:#0F7A47">Completada</b></td></tr>
+      </table>
+      ${liga ? `<p style="margin:18px 0 0"><a href="${esc(liga)}"
+         style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
+         border-radius:8px;display:inline-block;font-weight:600">Ver el expediente</a></p>` : ''}
+      <p style="margin:22px 0 0;font-size:12px;color:#888">
+         Enviado automáticamente por el Portal de Formatos de Sipnology</p>
+    </div>`;
+
+  const mensaje = {
+    subject: `Solicitud ${S.folio} completada · ${S.fmt.corto}`,
+    body: {contentType:'HTML', content:cuerpo},
+    toRecipients: [{emailAddress:{address:para}}],
+  };
+  if(pdfB64) mensaje.attachments = [{
+    '@odata.type':'#microsoft.graph.fileAttachment',
+    name: nombrePdf || 'Solicitud.pdf',
+    contentType:'application/pdf',
+    contentBytes: pdfB64,
+  }];
+
+  const r = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method:'POST',
+    headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+    body:JSON.stringify({message:mensaje, saveToSentItems:true}),
+  });
+  if(!r.ok) throw new Error('cierre HTTP '+r.status);
+  return { enviado:true, para };
+}
+
 /* ── Guardado con etapas ───────────────────────────────────────────
    Devuelve true si el expediente quedó archivado.                   */
 async function repoGuardarEtapa(opts){
@@ -3897,6 +4049,8 @@ async function repoGuardarEtapa(opts){
     // Al completarse, el expediente deja de estar en Pendientes
     if(completa) await graphQuitarDePendientes(drive, H, S.fmt.id, nombre);
 
+    // El estado queda en memoria para que la barra y el PDF lo reflejen
+    S.datos.__meta = payload._meta;
     guardarBorrador();
     toast(completa
       ? `Solicitud completada · pasó a ${COMPLETAS}`
@@ -3913,6 +4067,13 @@ async function repoGuardarEtapa(opts){
               'Administración la verá en el resumen diario.','inf',6500);
       }
     }
+
+    /* Al cerrarse, quien llama decide qué más hacer con la sesión ya
+       autenticada: generar el PDF y devolvérselo al solicitante. */
+    if(completa && typeof opts.alCompletar === 'function'){
+      try{ await opts.alCompletar(H, subido); }
+      catch(err){ console.error(err); }
+    }
     return true;
   }catch(e){
     console.error(e);
@@ -3920,6 +4081,37 @@ async function repoGuardarEtapa(opts){
       ? 'Se cerró la ventana de inicio de sesión.' : e.message;
     toast('No se archivó en SharePoint: '+m+' El PDF sí se generará.','err',7000);
     return false;
+  }
+}
+
+/* ── Entregar la solicitud ─────────────────────────────────────────
+   Es el único camino para los formatos de dos etapas: el solicitante
+   no descarga PDF, entrega el expediente. El PDF sale hasta que
+   Administración pone los montos y el transporte reales.            */
+async function enviarAdministracion(){
+  if(!S.fmt || !S.fmt.dosEtapas) return;
+  if(!validar()) return;
+
+  if(location.protocol === 'file:'){
+    toast('Para entregar la solicitud abre el portal publicado '+
+          '(sipnology.github.io/Formatos). Desde un archivo local el '+
+          'navegador bloquea el inicio de sesión de Microsoft.','err',8000);
+    return;
+  }
+
+  const btn = $('#btnEnviar');
+  const prev = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = 'Enviando…'; }
+  try{
+    const ok = await repoGuardarEtapa({yaValidado:true});
+    if(ok){
+      renderForm();            // la barra pasa a "Pendiente"
+      sincronizarCabecera();
+      toast(`Solicitud ${S.folio} entregada. Administración la completará y `+
+            `recibirás el PDF por correo.`,'ok',7000);
+    }
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = prev; }
   }
 }
 
@@ -4451,6 +4643,7 @@ function init(){
   // Repositorio SharePoint
   $('#btnRepoAbrir').onclick = repoAbrir;
   $('#btnAdmin').onclick     = activarModoAdmin;
+  $('#btnEnviar').onclick    = enviarAdministracion;
   // Navegación dentro del repositorio
   $('#navAtras').onclick     = navAtras;
   $('#navAdelante').onclick  = navAdelante;
