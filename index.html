@@ -683,11 +683,23 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       <path d="M7 11V7a5 5 0 0110 0v4"/></svg>
     Completar como Administración</button>
   <button class="btn btn-p" id="btnEnviar" style="display:none"
-          title="Archiva la solicitud en Pendientes y avisa a Administración">
+          title="Guarda la solicitud y manda la liga de autorización al jefe directo">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-    Enviar a Administración</button>
+    Enviar a Autorización</button>
+  <button class="btn btn-s" id="btnRechazar" style="display:none"
+          title="Devolver la solicitud al colaborador indicando el motivo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 6L6 18M6 6l12 12"/></svg>
+    Rechazar</button>
+  <button class="btn btn-p" id="btnAutorizar" style="display:none"
+          title="Autorizar esta solicitud y continuar el trámite">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6L9 17l-5-5"/></svg>
+    Autorizar</button>
   <button class="btn btn-p" id="btnPDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
@@ -1022,7 +1034,18 @@ viaticos:{
       campos:[
         {k:'solicitante', l:'Solicitante',        tipo:'text', w:6, req:1},
         {k:'area',        l:'Departamento',       tipo:'sel',  w:6, req:1, op:DEPTOS},
+        {k:'puesto',      l:'Cargo',              tipo:'text', w:6, req:1},
         {k:'analitica',   l:'Analítica / Proyecto',tipo:'text',w:6},
+
+        /* Quien autoriza. El correo debe ser el de la organización:
+           a esa cuenta se le manda la liga y contra ella se comprueba
+           la identidad al momento de autorizar. */
+        {k:'jefeNombre',  l:'Jefe Directo',       tipo:'text', w:6, req:1,
+         hint:'Quien autoriza esta solicitud.'},
+        {k:'jefeCorreo',  l:'Correo del Jefe Directo', tipo:'mail', w:6, req:1,
+         ph:'nombre.apellido@sipnology.com.mx',
+         hint:'A este correo llega la liga para autorizar.'},
+
         {k:'cliente',     l:'Nombre del Cliente', tipo:'text', w:6, req:1},
         {k:'proyecto',    l:'Nombre del Proyecto',tipo:'text', w:12, req:1},
         {k:'del',         l:'Período — Del',      tipo:'date', w:3, req:1},
@@ -1038,10 +1061,17 @@ viaticos:{
          pie:'Acompañantes registrados',
          cols:[{k:'nombre', l:'Nombre completo'}]},
       ]},
-    { t:'Transporte', d:'Los detalles se despliegan según el medio que elijas',
+    { t:'Transporte', d:'Indica si necesitas traslado y con qué medio',
       banner:'MEDIO DE TRANSPORTE Y CONSUMOS',
       campos:[
-        {k:'transporte', l:'Transporte', tipo:'check', w:12, req:1,
+        /* Puerta del apartado: igual que Hospedaje. Con esto la solicitud
+           cubre por sí sola los casos que antes obligaban a llenar el
+           formato aparte de Vuelo y Hospedaje. */
+        {k:'reqTransporte', l:'¿Requiere transporte?', tipo:'radio', w:12, req:1,
+         op:['Sí','No'],
+         hint:'Marca No si te trasladas por tu cuenta y no hay nada que reservar.'},
+
+        {k:'transporte', l:'Medio de Transporte', tipo:'check', w:12, req:1,
          op:['Automóvil Empresa','Automóvil Propio','Autobús','Avión'],
          hint:'Marca Avión o Autobús para capturar los datos del traslado.'},
         {k:'transporteOtro', l:'Otro — Especifique', tipo:'text', w:12},
@@ -1059,6 +1089,9 @@ viaticos:{
          cond:{k:'transporte', tiene:'Avión'}},
         {k:'vi_destino',  l:'Destino', tipo:'text', w:6, ph:'PBC — Puebla',
          cond:{k:'transporte', tiene:'Avión'}},
+        {k:'vi_costo',    l:'Costo del vuelo de ida', tipo:'dinero', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Avión'},
+         hint:'Lo captura Administración; suma al total de la solicitud.'},
 
         {tipo:'sub', l:'Vuelo de Regreso', cond:{k:'transporte', tiene:'Avión'}},
         {k:'vr_aerolinea',l:'Aerolínea',    tipo:'text', w:4, cond:{k:'transporte', tiene:'Avión'}},
@@ -1070,6 +1103,9 @@ viaticos:{
         {k:'vr_hlle',     l:'Hora de Llegada', tipo:'time', w:4, cond:{k:'transporte', tiene:'Avión'}},
         {k:'vr_origen',   l:'Origen',  tipo:'text', w:6, cond:{k:'transporte', tiene:'Avión'}},
         {k:'vr_destino',  l:'Destino', tipo:'text', w:6, cond:{k:'transporte', tiene:'Avión'}},
+        {k:'vr_costo',    l:'Costo del vuelo de regreso', tipo:'dinero', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Avión'},
+         hint:'Lo captura Administración; suma al total de la solicitud.'},
 
         {tipo:'nota', cond:{k:'transporte', tiene:'Avión'},
          l:'Los vuelos y horarios indicados son preferencias del solicitante. '+
@@ -1095,6 +1131,7 @@ viaticos:{
            {k:'hlle',     l:'Hora de Llegada', tipo:'time', w:4},
            {k:'origen',   l:'Origen',  tipo:'text', w:6, ph:'GDL — Guadalajara'},
            {k:'destino',  l:'Destino', tipo:'text', w:6, ph:'TIJ — Tijuana'},
+           {k:'costo',    l:'Costo del vuelo', tipo:'dinero', w:6, soloAdmin:1},
          ]},
 
         /* ═══ Solo si se marcó AUTOBÚS — sin extras de equipaje ═══ */
@@ -1112,6 +1149,9 @@ viaticos:{
          cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ai_destino',l:'Destino', tipo:'text', w:6, ph:'Puebla, Pue.',
          cond:{k:'transporte', tiene:'Autobús'}},
+        {k:'ai_costo',  l:'Costo del autobús de ida', tipo:'dinero', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Autobús'},
+         hint:'Lo captura Administración; suma al total de la solicitud.'},
 
         {tipo:'sub', l:'Autobús — Regreso', cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ar_linea',  l:'Línea de Autobús', tipo:'text', w:4, cond:{k:'transporte', tiene:'Autobús'}},
@@ -1124,6 +1164,9 @@ viaticos:{
         {k:'ar_hlle',   l:'Hora de Llegada',  tipo:'time', w:4, cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ar_origen', l:'Origen',  tipo:'text', w:6, cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ar_destino',l:'Destino', tipo:'text', w:6, cond:{k:'transporte', tiene:'Autobús'}},
+        {k:'ar_costo',  l:'Costo del autobús de regreso', tipo:'dinero', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Autobús'},
+         hint:'Lo captura Administración; suma al total de la solicitud.'},
 
         /* Recorridos largos: cada botón agrega un tramo con los mismos campos */
         {k:'busExtra', tipo:'bloques', w:12,
@@ -1139,6 +1182,7 @@ viaticos:{
            {k:'hlle',    l:'Hora de Llegada', tipo:'time', w:4},
            {k:'origen',  l:'Origen',  tipo:'text', w:6},
            {k:'destino', l:'Destino', tipo:'text', w:6},
+           {k:'costo',   l:'Costo del autobús', tipo:'dinero', w:6, soloAdmin:1},
          ]},
 
         {tipo:'nota', cond:{k:'transporte', tiene:'Autobús'},
@@ -1163,6 +1207,9 @@ viaticos:{
          desde:'hospDel', hasta:'hospAl',
          cond:{k:'hospedaje', igual:'Sí'},
          hint:'Se calcula solo a partir de las fechas de entrada y salida.'},
+        {k:'hospCosto', l:'Costo del hospedaje',  tipo:'dinero', w:6, soloAdmin:1,
+         cond:{k:'hospedaje', igual:'Sí'},
+         hint:'Lo captura Administración; suma al total de la solicitud.'},
         {k:'obsHosp',   l:'Observaciones',        tipo:'text',  w:12, ph:'Incluye desayuno',
          cond:{k:'hospedaje', igual:'Sí'}},
 
@@ -1177,12 +1224,22 @@ viaticos:{
            {k:'al',      l:'Hospedaje — Al',      tipo:'date',  w:4},
            {k:'noches',  l:'N.° de Noches',       tipo:'noches',w:4,
             desde:'del', hasta:'al'},
+           {k:'costo',   l:'Costo del hospedaje', tipo:'dinero', w:6, soloAdmin:1},
            {k:'obs',     l:'Observaciones',       tipo:'text',  w:12, ph:'Incluye desayuno'},
          ]},
       ]},
-    { t:'Desglose de Gastos', d:'Captura tarifa y días; los totales se calculan solos',
+    { t:'Anticipo de Gastos', d:'Solo lo que se entrega al colaborador antes del viaje',
       campos:[
+        /* Reembolso significa que el colaborador paga y comprueba después:
+           no hay nada que desglosar ni que depositar por adelantado. */
+        {k:'modalidad', l:'¿Cómo se cubren los gastos del colaborador?',
+         tipo:'radio', w:12, req:1, op:['Anticipo','Reembolso'],
+         hint:'Anticipo: se deposita antes del viaje. Reembolso: el colaborador paga '+
+              'y comprueba después. En ambos casos el transporte y el hospedaje los '+
+              'paga Administración directamente.'},
+
         {k:'gastos', tipo:'tabla', w:12,
+         cond:{k:'modalidad', igual:'Anticipo'},
          cols:[
            {k:'concepto', l:'Concepto',   tipo:'fijo',  ancho:'20%'},
            {k:'desc',     l:'Descripción del gasto', tipo:'fijo', ancho:'38%', clase:'dsc'},
@@ -1193,11 +1250,11 @@ viaticos:{
          filas:[
            {concepto:'Alimentos',   desc:'Desayuno $250 + Comida $250 + Cena $250 por día, antes de IVA.', tarifa:750},
            {concepto:'Propinas',    desc:'10% sobre el total de alimentos por día.', tarifa:75},
-           {concepto:'Hospedaje',   desc:'$1,500/noche por persona. Montos mayores requieren autorización Admón.', tarifa:1500},
+           /* Hospedaje, Autobús y Vuelos salieron de esta tabla: los paga
+              Administración directamente y sus importes se capturan en cada
+              tramo. Aquí solo queda lo que se le entrega al colaborador. */
            {concepto:'Gasolina',    desc:'Asignado por Admón. según km (ida y vuelta). Solo aplica >100 km.', libre:1},
            {concepto:'Casetas',     desc:'Asignado por Admón. según ruta inicio-destino. Solo aplica >100 km.', libre:1},
-           {concepto:'Autobús',     desc:'Conforme a horarios y necesidades indicadas por el colaborador.', libre:1},
-           {concepto:'Vuelos',      desc:'Gestionados por Administración. Clase económica. Mín. 2 opciones.', libre:1},
            {concepto:'Taxi / Uber', desc:'Transporte local en destino. Adjuntar recibo de la aplicación.', libre:1},
            {concepto:'Imprevistos', desc:'$500 fijos (reparaciones menores, casetas imprevistas, sanitarios, etc.).', tarifa:500},
            {concepto:'Otros',       desc:'Herramientas, materiales u otros gastos operativos. Indicar monto.', libre:1},
@@ -1211,28 +1268,48 @@ viaticos:{
         {k:'adm_fechaAut',  l:'Fecha de Autorización',  tipo:'date',   w:4, req:1},
         {k:'adm_autorizo',  l:'Autorizó',               tipo:'text',   w:4, req:1},
 
+        /* Los importes NO viven aquí: cada vuelo, autobús y hospedaje lleva
+           su propia casilla de costo. Tenerlos en dos lugares permitiría
+           capturar el mismo monto dos veces e inflar el total. */
         {tipo:'sub', l:'Transporte Adquirido'},
         {k:'adm_aerolinea', l:'Aerolínea',              tipo:'text',   w:4},
         {k:'adm_numVuelo',  l:'No. de Vuelo',           tipo:'text',   w:4},
         {k:'adm_pnr',       l:'Clave de Reservación',   tipo:'text',   w:4, ph:'PNR / localizador'},
-        {k:'adm_costoVuelo',l:'Costo del Vuelo',        tipo:'dinero', w:4},
-        {k:'adm_busLinea',  l:'Línea de Autobús',       tipo:'text',   w:4},
-        {k:'adm_costoBus',  l:'Costo del Autobús',      tipo:'dinero', w:4},
+        {k:'adm_busLinea',  l:'Línea de Autobús',       tipo:'text',   w:6},
 
         {tipo:'sub', l:'Hospedaje Confirmado'},
         {k:'adm_hotel',     l:'Hotel Reservado',        tipo:'text',   w:6},
-        {k:'adm_hotelConf', l:'No. de Confirmación',    tipo:'text',   w:3},
-        {k:'adm_costoHotel',l:'Costo del Hospedaje',    tipo:'dinero', w:3},
+        {k:'adm_hotelConf', l:'No. de Confirmación',    tipo:'text',   w:6},
 
         {k:'adm_obs', l:'Observaciones de Administración', tipo:'area', w:12, rows:2},
       ]},
 
-    { t:'Resumen de Montos', d:'Total y forma de entrega',
+    { t:'Resumen de Montos', d:'Qué recibe el colaborador y qué paga Administración',
       campos:[
-        // Toma directamente el Total solicitado del desglose de gastos
-        {k:'montoSol', l:'Monto Solicitado', tipo:'calc', w:6,
+        /* Tres subtotales de naturaleza distinta: el primero se deposita al
+           colaborador, los otros dos los liquida Administración con el
+           proveedor. Mezclarlos haría creer que el empleado recibe todo. */
+        {k:'subAnticipo', l:'Subtotal · Anticipo al colaborador', tipo:'calc', w:6,
          formula:{totalTabla:'gastos'},
-         hint:'Corresponde al Total solicitado del desglose de gastos.'},
+         hint:'Total del desglose del apartado 4. Es lo único que se deposita.'},
+
+        {k:'subTransporte', l:'Subtotal · Transporte', tipo:'calc', w:6,
+         formula:{sumaConBloques:{
+           campos:['vi_costo','vr_costo','ai_costo','ar_costo'],
+           bloques:[{k:'vuelosExtra', campo:'costo'}, {k:'busExtra', campo:'costo'}],
+         }},
+         hint:'Vuelos y autobuses. Lo paga Administración directamente.'},
+
+        {k:'subHospedaje', l:'Subtotal · Hospedaje', tipo:'calc', w:6,
+         formula:{sumaConBloques:{
+           campos:['hospCosto'],
+           bloques:[{k:'hospedajesExtra', campo:'costo'}],
+         }},
+         hint:'Lo paga Administración directamente.'},
+
+        {k:'totalSolicitud', l:'TOTAL DE LA SOLICITUD', tipo:'calc', w:6,
+         formula:{sumaCalc:['subAnticipo','subTransporte','subHospedaje']},
+         hint:'Costo completo del viaje para la empresa.'},
 
         {k:'deposito', l:'Forma de Depósito', tipo:'radio', w:12, req:1,
          op:['Cuenta de Nómina','Otra cuenta']},
@@ -1554,6 +1631,22 @@ responsiva:{
    `noDoc` evita que se repita como fila dentro del documento: ya
    aparece en el recuadro FOLIO del encabezado.
    ─────────────────────────────────────────────────────────────────── */
+/* ── El apartado de Transporte se comporta como el de Hospedaje ──────
+   En vez de repetir la condición en cuarenta campos —donde olvidar uno
+   deja una casilla huérfana en pantalla— se aplica de una vez sobre la
+   sección completa al terminar de definirla. */
+(function transporteOpcional(){
+  const sec = FORMATOS.viaticos.secciones.find(s => s.t === 'Transporte');
+  if(!sec) return;
+  const puerta = {k:'reqTransporte', igual:'Sí'};
+  sec.campos.forEach(c => {
+    if(c.k === 'reqTransporte') return;
+    if(c.todas)      c.todas.push(puerta);
+    else if(c.cond){ c.todas = [c.cond, puerta]; delete c.cond; }
+    else             c.todas = [puerta];
+  });
+})();
+
 Object.values(FORMATOS).forEach(f=>{
   f.secciones[0].campos.unshift({
     k:'folioNum', l:'N.° de Folio', tipo:'entero', w:3, noDoc:1, ph:'001',
@@ -1774,13 +1867,44 @@ function valorCalculado(c){
     return hayDato ? r : 0;
   }
   if(f.suma) return f.suma.reduce((a,k)=>a+(parseFloat(limpiaNum(S.datos[k]))||0), 0);
+
+  /* Suma de campos sueltos MÁS los de cada tramo agregado. Un viaje con
+     tres escalas tiene tres costos que solo existen dentro del bloque
+     repetible, y ninguna fórmula plana los alcanzaría. */
+  if(f.sumaConBloques){
+    let tot = (f.sumaConBloques.campos || [])
+      .reduce((a,k)=>a+(parseFloat(limpiaNum(S.datos[k]))||0), 0);
+    (f.sumaConBloques.bloques || []).forEach(b=>{
+      const arr = S.datos[b.k];
+      if(!Array.isArray(arr)) return;
+      arr.forEach(rv=>{ if(rv) tot += parseFloat(limpiaNum(rv[b.campo])) || 0; });
+    });
+    return tot;
+  }
+
+  /* Suma de otros campos calculados: permite un total de totales sin
+     repetir sus fórmulas. */
+  if(f.sumaCalc){
+    const porClave = {};
+    S.fmt.secciones.forEach(s=>s.campos.forEach(c2=>{ if(c2.k) porClave[c2.k]=c2; }));
+    return f.sumaCalc.reduce((a,k)=>{
+      const c2 = porClave[k];
+      return a + (c2 ? valorCalculado(c2) : 0);
+    }, 0);
+  }
   return 0;
 }
 /* Claves que alimentan alguna fórmula: al cambiar, se recalcula */
 function clavesDeFormula(){
   const set = new Set();
   S.fmt.secciones.forEach(s=>s.campos.forEach(c=>{
-    if(c.formula) (c.formula.mult || c.formula.suma || []).forEach(k=>set.add(k));
+    const f = c.formula;
+    if(!f) return;
+    (f.mult || f.suma || []).forEach(k=>set.add(k));
+    if(f.sumaConBloques){
+      (f.sumaConBloques.campos || []).forEach(k=>set.add(k));
+      (f.sumaConBloques.bloques || []).forEach(b=>set.add(b.k));
+    }
   }));
   return set;
 }
@@ -2052,7 +2176,7 @@ function bloquesHTML(c){
           Eliminar</button>
       </div>
       <div class="blk-b"><div class="f-grid">
-        ${c.campos.map(sc=>campoBloqueHTML(c.k, i, sc, rv)).join('')}
+        ${c.campos.filter(visible).map(sc=>campoBloqueHTML(c.k, i, sc, rv)).join('')}
       </div></div>
     </div>`).join('');
 
@@ -2124,9 +2248,16 @@ function actualizarProgreso(){
     nota = ` · <span style="color:var(--warn)">copia local · no se archiva ni avisa a `+
            `Administración. Usa el portal publicado.</span>`;
   }else if(S.fmt.dosEtapas){
+    const e = etapa();
     nota = S.modoAdmin
-      ? ` · <span style="color:var(--ok)">modo Administración · al completar pasa a Completas y el PDF va al solicitante</span>`
-      : ` · <span style="color:var(--or-d)">al enviarla queda en Pendientes; el PDF lo genera Administración</span>`;
+      ? ` · <span style="color:var(--ok)">modo Administración · al completar se cierra y el PDF va al solicitante</span>`
+      : ({
+        'Borrador'     : ` · <span style="color:var(--or-d)">al enviarla, ${esc(S.datos.jefeNombre||'tu jefe directo')} recibe la liga para autorizarla</span>`,
+        'Por autorizar': ` · <span style="color:var(--or-d)">esperando autorización de ${esc(S.datos.jefeNombre||S.datos.jefeCorreo||'el jefe directo')}</span>`,
+        'Autorizada'   : ` · <span style="color:var(--ok)">autorizada · Administración la está completando</span>`,
+        'Completa'     : ` · <span style="color:var(--ok)">completa · el PDF ya está disponible</span>`,
+        'Rechazada'    : ` · <span style="color:var(--warn)">devuelta: ${esc((S.datos.__meta||{}).motivoRechazo||'sin motivo')}</span>`,
+      }[e] || '');
   }else if(S.fmt.subeRepo){
     nota = ` · <span style="color:var(--or-d)">al descargar el PDF se archiva en SharePoint</span>`;
   }
@@ -2137,34 +2268,41 @@ function actualizarProgreso(){
   sincronizarBotones();
 }
 
-/* Los formatos de dos etapas tienen dos caminos distintos y excluyentes:
-   el solicitante entrega, Administración completa y descarga. Mostrar
-   los dos botones activos al mismo tiempo invita a bajar un PDF a medias. */
+/* Cada etapa espera a una persona distinta, y solo esa persona debe ver
+   un botón encendido. Mostrarlos todos invita a bajar un PDF a medias o
+   a que autorice quien no debe. */
 function sincronizarBotones(){
   const dos   = !!S.fmt.dosEtapas;
   const admin = !!S.modoAdmin;
+  const e     = dos ? etapa() : 'Completa';
+  const jefe  = dos && typeof esJefe === 'function' && esJefe();
 
-  const bAdm = $('#btnAdmin');
-  if(bAdm) bAdm.style.display = (dos && !admin) ? '' : 'none';
+  const ver = (sel, on) => { const b = $(sel); if(b) b.style.display = on ? '' : 'none'; };
 
-  const bEnv = $('#btnEnviar');
-  if(bEnv) bEnv.style.display = (dos && !admin) ? '' : 'none';
+  /* El solicitante entrega, o vuelve a entregar si le devolvieron la solicitud */
+  ver('#btnEnviar',    dos && !admin && (e==='Borrador' || e==='Rechazada'));
+  /* Solo el jefe capturado en el apartado 1, y solo mientras esté pendiente */
+  ver('#btnAutorizar', dos && e==='Por autorizar' && jefe);
+  ver('#btnRechazar',  dos && e==='Por autorizar' && jefe);
+  /* Administración entra a capturar una vez que está autorizada */
+  ver('#btnAdmin',     dos && !admin && e==='Autorizada');
 
   const bPDF = $('#btnPDF');
   if(!bPDF) return;
   const txt = $('#btnPDFTxt');
+  const puede = !dos || e==='Completa' || admin;
 
-  if(dos && !admin){
-    bPDF.disabled = true;
-    bPDF.classList.remove('btn-p'); bPDF.classList.add('btn-s');
-    bPDF.title = 'Disponible cuando Administración complete la solicitud';
-    if(txt) txt.textContent = 'Descargar PDF';
-  }else{
-    bPDF.disabled = false;
-    bPDF.classList.remove('btn-s'); bPDF.classList.add('btn-p');
-    bPDF.title = '';
-    if(txt) txt.textContent = (dos && admin) ? 'Completar y descargar PDF' : 'Descargar PDF';
-  }
+  bPDF.disabled = !puede;
+  bPDF.classList.toggle('btn-p', puede);
+  bPDF.classList.toggle('btn-s', !puede);
+  bPDF.title = puede ? '' : {
+    'Borrador'     :'Primero envíala a autorización',
+    'Por autorizar':'Esperando la autorización del jefe directo',
+    'Autorizada'   :'Esperando que Administración la complete',
+    'Rechazada'    :'Fue devuelta: corrígela y vuelve a enviarla',
+  }[e] || 'Aún no está disponible';
+  if(txt) txt.textContent = (dos && admin && e!=='Completa')
+    ? 'Completar y descargar PDF' : 'Descargar PDF';
 }
 
 function actualizarTablas(){
@@ -3110,9 +3248,14 @@ async function descargarPDF(){
   /* En los formatos de dos etapas el PDF no existe hasta que
      Administración captura montos y transporte reales. Antes de eso
      sería un documento incompleto circulando como si fuera el bueno. */
-  if(S.fmt.dosEtapas && !S.modoAdmin){
-    toast('El PDF se genera cuando Administración complete la solicitud. '+
-          'Usa "Enviar a Administración" para entregarla.','inf',6000);
+  if(S.fmt.dosEtapas && !S.modoAdmin && etapa()!=='Completa'){
+    const donde = {
+      'Borrador'     :'Usa "Enviar a Autorización" para entregarla.',
+      'Por autorizar':'Está esperando la autorización de '+(S.datos.jefeNombre||'tu jefe directo')+'.',
+      'Autorizada'   :'Ya está autorizada; falta que Administración la complete.',
+      'Rechazada'    :'Fue devuelta. Corrige y vuelve a enviarla a autorización.',
+    }[etapa()] || '';
+    toast('El PDF se libera cuando la solicitud queda cerrada. '+donde,'inf',6500);
     return;
   }
   if(!validar()) return;
@@ -3136,30 +3279,35 @@ async function descargarPDF(){
               'portal desde un archivo local. Usa '+
               'sipnology.github.io/Formatos para que la solicitud cuente.',
               'err', 9000);
-      }else if(S.fmt.dosEtapas){
-        /* Cierre de Administración: se archiva en Completas y, con la
-           sesión ya abierta, el PDF definitivo regresa al solicitante. */
+      }else if(S.fmt.dosEtapas && S.modoAdmin){
+        /* Cierre de Administración: pasa a Completas y, con la sesión ya
+           abierta, el PDF definitivo regresa al solicitante. */
         if(btn) btn.innerHTML = 'Completando…';
-        await repoGuardarEtapa({
-          yaValidado:true,
-          alCompletar: async (H, subido, drive) => {
-            if(!pdfListo()) return;
+        const r = await guardarEnEtapa('Completa', {
+          completadaPor: (cuentaActiva()||{}).username || '',
+          completadaEn : new Date().toISOString(),
+        }, {yaValidado:true});
+        if(r){
+          toast('Solicitud completada · pasó a '+COMPLETAS,'ok',5000);
+          if(pdfListo()){
             if(btn) btn.innerHTML = 'Enviando al solicitante…';
             try{
               const b64 = await pdfBase64();
-              const r = await enviarCierre(H, ligas(drive, subido), b64,
+              const e = await enviarCierre(r.H, ligas(r.drive, r.subido), b64,
                                            nombreArchivo('pdf'));
-              toast(r.enviado
-                ? 'PDF enviado a '+r.para
-                : 'No se envió el PDF al solicitante: '+r.motivo+'.',
-                r.enviado ? 'ok' : 'inf', 5500);
+              toast(e.enviado
+                ? 'PDF enviado a '+e.para
+                : 'No se envió el PDF al solicitante: '+e.motivo+'.',
+                e.enviado ? 'ok' : 'inf', 5500);
             }catch(err){
               console.error(err);
               toast('La solicitud quedó completada, pero no salió el correo '+
                     'con el PDF al solicitante.','inf',6500);
             }
-          },
-        });
+          }
+        }
+      }else if(S.fmt.dosEtapas){
+        /* Ya está cerrada: solo se vuelve a generar el documento */
       }else{
         if(btn) btn.innerHTML = 'Archivando…';
         await repoGuardar({yaValidado:true});
@@ -3511,14 +3659,14 @@ function fiGuardarDiferido(){
 
 /* ═══════════════════════════════════════════════════════════════════
    REPOSITORIO M365 · SharePoint vía Microsoft Graph / Entra ID
-   Mismo esquema que el Cotizador: el usuario entra con su cuenta de
-   Microsoft 365 y el acceso queda limitado a la organización.
+   El usuario entra con su cuenta de Microsoft 365 y el acceso queda
+   limitado a la organización.
    No hay tokens en el código: MSAL los obtiene al iniciar sesión.
    ═══════════════════════════════════════════════════════════════════ */
 
 const GRAPH_KEY = 'sip_graph_cfg_formatos';
 const DEFAULT_GRAPH_CFG = {
-  clientId : 'a2093ffe-4c19-4c6c-8fed-3b3079f88741',  /* Formatos Sipnology — registro propio */
+  clientId : 'a2093ffe-4c19-4c6c-8fed-3b3079f88741',  /* Formatos Sipnology */
   tenantId : '7e4245e5-225d-4ad0-9cf3-276fcc694c15',
   host     : 'sipnologysacv.sharepoint.com',
   sitePath : '/sites/Formatos',
@@ -3537,21 +3685,10 @@ const CARPETAS = {
 
 let _msalApp = null;
 
-/* Client ID heredado: el portal usaba el registro del Cotizador.
-   Formatos ya tiene el suyo propio, así que si alguien conserva el
-   anterior en su navegador lo migramos solo, sin que tenga que
-   restaurar la configuración a mano. */
-const CLIENT_ID_HEREDADO = '301142e3-19ee-4d69-9dd9-8e15e564d922';
-
 function getGraphCfg(){
   try{
     const s = JSON.parse(localStorage.getItem(GRAPH_KEY) || 'null');
-    if(!s || !s.clientId) return DEFAULT_GRAPH_CFG;
-    if(s.clientId === CLIENT_ID_HEREDADO){
-      s.clientId = DEFAULT_GRAPH_CFG.clientId;
-      try{ localStorage.setItem(GRAPH_KEY, JSON.stringify(s)); }catch(e){}
-    }
-    return s;
+    return (s && s.clientId) ? s : DEFAULT_GRAPH_CFG;
   }catch(e){ return DEFAULT_GRAPH_CFG; }
 }
 function setGraphCfg(c){ localStorage.setItem(GRAPH_KEY, JSON.stringify(c)); }
@@ -4001,8 +4138,46 @@ const AVISOS_DEFAULT = {
   vuelo    : ['fernando.fernandez@sipnology.com.mx'],
 };
 
-const PENDIENTES = 'Pendientes';
-const COMPLETAS  = 'Completas';
+/* ── Etapas del expediente ─────────────────────────────────────────
+   Borrador → Por autorizar → Autorizada → Completa
+   El jefe directo autoriza; Administración cierra. Cada etapa vive en
+   su propia carpeta para que se sepa de un vistazo qué está esperando
+   a quién.                                                            */
+const POR_AUTORIZAR = 'Por autorizar';
+const PENDIENTES    = 'Pendientes';
+const COMPLETAS     = 'Completas';
+const RECHAZADAS    = 'Rechazadas';
+
+const CARPETA_DE = {
+  'Por autorizar': POR_AUTORIZAR,
+  'Autorizada'   : PENDIENTES,
+  'Completa'     : COMPLETAS,
+  'Rechazada'    : RECHAZADAS,
+};
+
+function etapa(){
+  const m = (S.datos && S.datos.__meta) || {};
+  return m.estado || 'Borrador';
+}
+
+/* ¿Queda algo que Administración tenga que capturar? Si el colaborador
+   pide reembolso y no necesita transporte ni hotel, no hay costos que
+   asignar ni depósito que hacer: con la autorización del jefe basta. */
+function requiereAdministracion(){
+  const d = S.datos || {};
+  const t = Array.isArray(d.transporte) ? d.transporte : [];
+  return t.includes('Avión') || t.includes('Autobús') ||
+         d.hospedaje === 'Sí' || d.modalidad === 'Anticipo';
+}
+
+/* La autorización la da la persona cuyo correo se capturó en el
+   apartado 1, no cualquiera que reciba la liga. */
+function esJefe(){
+  const c = cuentaActiva();
+  if(!c) return false;
+  const j = String((S.datos||{}).jefeCorreo || '').trim().toLowerCase();
+  return !!j && String(c.username||'').trim().toLowerCase() === j;
+}
 
 function getAdmins(){
   try{ const s = JSON.parse(localStorage.getItem(ADMINS_KEY)||'null');
@@ -4024,11 +4199,11 @@ function esAdmin(){
   return getAdmins().some(a => String(a).trim().toLowerCase() === correo);
 }
 
-/* Carpeta destino según el estado */
+/* Carpeta destino según la etapa */
 function rutaCarpeta(fmtId, estado){
   const base = CARPETAS[fmtId] || 'Otros';
   if(!FORMATOS[fmtId] || !FORMATOS[fmtId].dosEtapas) return base;
-  return base + '/' + (estado===COMPLETAS ? COMPLETAS : PENDIENTES);
+  return base + '/' + (CARPETA_DE[estado] || POR_AUTORIZAR);
 }
 
 /* Crea la ruta completa, nivel por nivel */
@@ -4054,9 +4229,9 @@ async function graphAsegurarRuta(drive, H, ruta){
   }
 }
 
-/* Elimina el archivo de Pendientes al pasar a Completas */
-async function graphQuitarDePendientes(drive, H, fmtId, nombre){
-  const ruta = `${CARPETAS[fmtId]}/${PENDIENTES}/${nombre}`;
+/* Elimina el archivo de la carpeta donde estaba, al cambiar de etapa */
+async function graphQuitarDe(drive, H, fmtId, carpeta, nombre){
+  const ruta = `${CARPETAS[fmtId]}/${carpeta}/${nombre}`;
   const r = await fetch(
     `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(ruta)}`,
     {headers:H});
@@ -4184,126 +4359,255 @@ async function enviarCierre(H, liga, pdfB64, nombrePdf){
   return { enviado:true, para };
 }
 
-/* ── Guardado con etapas ───────────────────────────────────────────
-   Devuelve true si el expediente quedó archivado.                   */
-async function repoGuardarEtapa(opts){
+/* ── Guardado por etapa ────────────────────────────────────────────
+   Escribe el expediente en la carpeta que le toca, lo borra de la
+   anterior y devuelve lo necesario para armar ligas y correos.       */
+async function guardarEnEtapa(nuevoEstado, extra, opts){
   opts = opts || {};
-  if(!S.fmt) return false;
-  if(!opts.yaValidado && !validar()) return false;
+  if(!S.fmt) return null;
+  if(!opts.yaValidado && !validar()) return null;
 
-  const cfg = getGraphCfg();
   if(location.protocol === 'file:'){
     toast('Guardar en SharePoint requiere abrir el portal desde su dirección '+
           'publicada (https).','err',6000);
-    return false;
+    return null;
   }
 
-  const completa = !!(S.fmt.dosEtapas && S.modoAdmin);
-  const estado = completa ? COMPLETAS : PENDIENTES;
+  const cfg = getGraphCfg();
+  const previo = (S.datos.__meta) || {};
+  const estadoAnterior = previo.estado || '';
 
+  const token = await graphToken(cfg);
+  const H = {Authorization:'Bearer '+token};
+  const drive = await graphDrive(cfg, H);
+
+  const carpeta = rutaCarpeta(S.fmt.id, nuevoEstado);
+  await graphAsegurarRuta(drive, H, carpeta);
+
+  const nombre = nombreArchivo('json');
+  const meta = Object.assign({}, previo, {
+    formato:S.fmt.id, nombre:S.fmt.nombre, folio:S.folio,
+    fecha:S.datos.fecha || S.datos.del || hoyISO(),
+    version:S.fmt.version,
+    estado:nuevoEstado,
+    app:'Portal de Formatos Sipnology v1.3',
+  }, extra || {});
+
+  const ruta = `${carpeta}/${nombre}`;
+  const up = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(ruta)}:/content`,
+    {method:'PUT',
+     headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+     body:JSON.stringify({_meta:meta, datos:S.datos}, null, 2)});
+  if(!up.ok) throw new Error('No se pudo subir el archivo (HTTP '+up.status+').');
+  const subido = await up.json().catch(()=>({}));
+
+  // El expediente no debe quedar duplicado en la etapa anterior
+  const carpetaAnterior = CARPETA_DE[estadoAnterior];
+  if(carpetaAnterior && carpetaAnterior !== CARPETA_DE[nuevoEstado]){
+    try{ await graphQuitarDe(drive, H, S.fmt.id, carpetaAnterior, nombre); }
+    catch(e){ console.error(e); }
+  }
+
+  S.datos.__meta = meta;
+  guardarBorrador();
+  return {H, drive, subido, carpeta, meta};
+}
+
+/* Envoltura con el manejo de errores que comparten todos los botones */
+async function conRepositorio(accion, btn, etiquetas){
+  const prev = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = etiquetas || 'Guardando…'; }
   try{
-    const token = await graphToken(cfg);
-    const H = {Authorization:'Bearer '+token};
-    const drive = await graphDrive(cfg, H);
-
-    const carpeta = rutaCarpeta(S.fmt.id, estado);
-    await graphAsegurarRuta(drive, H, carpeta);
-
-    const nombre = nombreArchivo('json');
-    const cuenta = cuentaActiva();
-    const previo = (S.datos.__meta) || {};
-    const payload = {
-      _meta:{
-        formato:S.fmt.id, nombre:S.fmt.nombre, folio:S.folio,
-        fecha:S.datos.fecha || S.datos.del || hoyISO(),
-        version:S.fmt.version,
-        estado: S.fmt.dosEtapas ? (completa ? 'Completa' : 'Pendiente') : 'Entregada',
-        entregadaPor: previo.entregadaPor ||
-                      (cuenta ? (cuenta.username||'') : ''),
-        entregadaEn:  previo.entregadaEn || new Date().toISOString(),
-        completadaPor: completa && cuenta ? (cuenta.username||'') : (previo.completadaPor||''),
-        completadaEn:  completa ? new Date().toISOString() : (previo.completadaEn||''),
-        app:'Portal de Formatos Sipnology v1.2',
-      },
-      datos:S.datos,
-    };
-
-    const ruta = `${carpeta}/${nombre}`;
-    const up = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encodeURIComponent(ruta)}:/content`,
-      {method:'PUT',
-       headers:Object.assign({}, H, {'Content-Type':'application/json'}),
-       body:JSON.stringify(payload, null, 2)});
-    if(!up.ok) throw new Error('No se pudo subir el archivo (HTTP '+up.status+').');
-    const subido = await up.json().catch(()=>({}));
-
-    // Al completarse, el expediente deja de estar en Pendientes
-    if(completa) await graphQuitarDePendientes(drive, H, S.fmt.id, nombre);
-
-    // El estado queda en memoria para que la barra y el PDF lo reflejen
-    S.datos.__meta = payload._meta;
-    guardarBorrador();
-    toast(completa
-      ? `Solicitud completada · pasó a ${COMPLETAS}`
-      : `Archivada en SharePoint · ${carpeta}`, 'ok', 5000);
-
-    // El aviso solo va cuando el expediente entra a Pendientes
-    if(!completa && S.fmt.dosEtapas){
-      try{
-        await enviarAviso(H, ligas(drive, subido));
-        toast('Aviso enviado a Administración','ok',3800);
-      }catch(err){
-        console.error(err);
-        toast('La solicitud sí se archivó, pero no salió el aviso por correo. '+
-              'Administración la verá en el resumen diario.','inf',6500);
-      }
-    }
-
-    /* Al cerrarse, quien llama decide qué más hacer con la sesión ya
-       autenticada: generar el PDF y devolvérselo al solicitante. */
-    if(completa && typeof opts.alCompletar === 'function'){
-      try{ await opts.alCompletar(H, subido, drive); }
-      catch(err){ console.error(err); }
-    }
-    return true;
+    return await accion();
   }catch(e){
     console.error(e);
     const m = /popup|user_cancelled|interaction/i.test(e.message||'')
-      ? 'Se cerró la ventana de inicio de sesión.' : e.message;
-    toast('No se archivó en SharePoint: '+m+' El PDF sí se generará.','err',7000);
-    return false;
+      ? 'Se cerró la ventana de inicio de sesión.' : (e.message || e);
+    toast('No se completó la operación: '+m, 'err', 7000);
+    return null;
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = prev; }
+    renderForm(); sincronizarCabecera();
   }
 }
 
-/* ── Entregar la solicitud ─────────────────────────────────────────
-   Es el único camino para los formatos de dos etapas: el solicitante
-   no descarga PDF, entrega el expediente. El PDF sale hasta que
-   Administración pone los montos y el transporte reales.            */
-async function enviarAdministracion(){
+/* ── 1 · El solicitante entrega para autorización ──────────────────
+   Único botón activo para él. No hay PDF hasta que la solicitud esté
+   cerrada: un documento a medias circulando como si fuera el bueno es
+   justo lo que este flujo evita.                                     */
+async function enviarAutorizacion(){
   if(!S.fmt || !S.fmt.dosEtapas) return;
   if(!validar()) return;
 
-  if(location.protocol === 'file:'){
-    toast('Para entregar la solicitud abre el portal publicado '+
-          '(sipnology.github.io/Formatos). Desde un archivo local el '+
-          'navegador bloquea el inicio de sesión de Microsoft.','err',8000);
+  const jefe = String(S.datos.jefeCorreo||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(jefe)){
+    toast('Revisa el correo del jefe directo: a esa cuenta se manda la '+
+          'liga para autorizar.','err',6000);
     return;
   }
 
-  const btn = $('#btnEnviar');
-  const prev = btn ? btn.innerHTML : '';
-  if(btn){ btn.disabled = true; btn.innerHTML = 'Enviando…'; }
-  try{
-    const ok = await repoGuardarEtapa({yaValidado:true});
-    if(ok){
-      renderForm();            // la barra pasa a "Pendiente"
-      sincronizarCabecera();
-      toast(`Solicitud ${S.folio} entregada. Administración la completará y `+
-            `recibirás el PDF por correo.`,'ok',7000);
+  await conRepositorio(async ()=>{
+    const r = await guardarEnEtapa('Por autorizar', {
+      entregadaPor: (cuentaActiva()||{}).username || '',
+      entregadaEn : new Date().toISOString(),
+    }, {yaValidado:true});
+    if(!r) return;
+
+    try{
+      await correoAutorizacion(r.H, ligas(r.drive, r.subido));
+      toast(`Solicitud ${S.folio} enviada a ${S.datos.jefeNombre||jefe} para su `+
+            `autorización.`,'ok',7000);
+    }catch(err){
+      console.error(err);
+      toast('La solicitud quedó guardada, pero no salió el correo al jefe '+
+            'directo. Avísale para que la abra desde el Repositorio.','inf',7500);
     }
-  }finally{
-    if(btn){ btn.disabled = false; btn.innerHTML = prev; }
+  }, $('#btnEnviar'), 'Enviando…');
+}
+
+/* ── 2 · El jefe autoriza o rechaza ────────────────────────────────── */
+async function autorizarSolicitud(){
+  if(!esJefe()){
+    const c = cuentaActiva();
+    toast(`Esta solicitud solo la puede autorizar ${S.datos.jefeCorreo||'el jefe directo'}. `+
+          `Entraste como ${c?c.username:'—'}.`,'err',7000);
+    return;
   }
+  const sigue = requiereAdministracion();
+
+  await conRepositorio(async ()=>{
+    const sello = {
+      autorizadaPor: (cuentaActiva()||{}).username || '',
+      autorizadaEn : new Date().toISOString(),
+    };
+
+    if(sigue){
+      const r = await guardarEnEtapa('Autorizada', sello, {yaValidado:true});
+      if(!r) return;
+      try{
+        await enviarAviso(r.H, ligas(r.drive, r.subido));
+        toast('Autorizada. Administración ya fue notificada para completarla.','ok',6500);
+      }catch(err){
+        console.error(err);
+        toast('Autorizada, pero no salió el aviso a Administración.','inf',6500);
+      }
+    }else{
+      /* Reembolso sin transporte ni hospedaje: no hay nada que capturar,
+         así que la autorización del jefe la deja lista. */
+      const r = await guardarEnEtapa('Completa', Object.assign({}, sello, {
+        completadaPor: sello.autorizadaPor,
+        completadaEn : sello.autorizadaEn,
+      }), {yaValidado:true});
+      if(!r) return;
+      toast('Autorizada y cerrada · no requiere captura de Administración.','ok',6000);
+      try{
+        const b64 = pdfListo() ? await pdfBase64() : '';
+        const e = await enviarCierre(r.H, ligas(r.drive, r.subido), b64, nombreArchivo('pdf'));
+        if(e.enviado) toast('PDF enviado a '+e.para,'ok',5000);
+      }catch(err){ console.error(err); }
+    }
+  }, $('#btnAutorizar'), 'Autorizando…');
+}
+
+function rechazarSolicitud(){
+  if(!esJefe()){
+    const c = cuentaActiva();
+    toast(`Esta solicitud solo la puede rechazar ${S.datos.jefeCorreo||'el jefe directo'}. `+
+          `Entraste como ${c?c.username:'—'}.`,'err',7000);
+    return;
+  }
+  const motivo = prompt('Motivo del rechazo (lo verá el solicitante):','');
+  if(motivo===null) return;
+  if(!String(motivo).trim()){
+    toast('Escribe el motivo: sin él, el solicitante no sabe qué corregir.','err',5000);
+    return;
+  }
+  conRepositorio(async ()=>{
+    const r = await guardarEnEtapa('Rechazada', {
+      rechazadaPor : (cuentaActiva()||{}).username || '',
+      rechazadaEn  : new Date().toISOString(),
+      motivoRechazo: String(motivo).trim(),
+    }, {yaValidado:true});
+    if(!r) return;
+    try{ await correoRechazo(r.H, ligas(r.drive, r.subido), String(motivo).trim()); }
+    catch(err){ console.error(err); }
+    toast('Solicitud rechazada. Se avisó al solicitante con el motivo.','ok',6000);
+  }, $('#btnRechazar'), 'Enviando…');
+}
+
+/* ── Correo al jefe directo ────────────────────────────────────────── */
+async function correoAutorizacion(H, liga){
+  liga = liga || {};
+  const d = S.datos, cuenta = cuentaActiva();
+  const para = String(d.jefeCorreo||'').trim();
+  const fila = (k,v)=>`<tr><td style="padding:4px 16px 4px 0;color:#666;white-space:nowrap">${esc(k)}</td>
+      <td style="padding:4px 0"><b>${esc(v||'—')}</b></td></tr>`;
+  const periodo = [fDate(d.del), fDate(d.al)].filter(Boolean).join(' al ');
+
+  const cuerpo = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
+      <p style="margin:0 0 14px">${esc(d.solicitante||'Un colaborador')} solicita tu
+         autorización para el siguiente viaje.</p>
+      <table style="border-collapse:collapse;font-size:14px">
+        ${fila('ID de solicitud', S.folio)}
+        ${fila('Solicitante', d.solicitante)}
+        ${fila('Departamento', d.area)}
+        ${fila('Cargo', d.puesto)}
+        ${fila('Cliente', d.cliente)}
+        ${fila('Fechas', periodo)}
+        ${fila('Propósito del viaje', d.motivo)}
+      </table>
+      ${liga.portal ? `<p style="margin:20px 0 6px"><a href="${esc(liga.portal)}"
+         style="background:#E05C14;color:#fff;text-decoration:none;padding:11px 20px;
+         border-radius:8px;display:inline-block;font-weight:600">Revisar y autorizar</a></p>
+      <p style="margin:0;font-size:12px;color:#888">Se abre en el portal con la solicitud
+         completa, incluido el desglose. Ahí encontrarás los botones para autorizar o
+         rechazar.</p>` : ''}
+      <p style="margin:22px 0 0;font-size:12px;color:#888">
+         Enviado automáticamente por el Portal de Formatos de Sipnology
+         ${cuenta ? '· '+esc(cuenta.username||'') : ''}</p>
+    </div>`;
+
+  const r = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method:'POST',
+    headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+    body:JSON.stringify({message:{
+      subject:`Autorización requerida · ${S.folio} · ${esc(d.solicitante||'')}`,
+      body:{contentType:'HTML', content:cuerpo},
+      toRecipients:[{emailAddress:{address:para}}],
+    }, saveToSentItems:true}),
+  });
+  if(!r.ok) throw new Error('autorización HTTP '+r.status);
+}
+
+/* ── Correo de rechazo al solicitante ──────────────────────────────── */
+async function correoRechazo(H, liga, motivo){
+  liga = liga || {};
+  const para = correoDelSolicitante();
+  if(!para) return;
+  const cuerpo = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
+      <p style="margin:0 0 14px">Tu solicitud <b>${esc(S.folio)}</b> fue devuelta por
+         ${esc(S.datos.jefeNombre || 'tu jefe directo')}.</p>
+      <p style="margin:0 0 14px;padding:12px 14px;background:#FDF0EC;
+         border-left:3px solid #C0392B"><b>Motivo:</b> ${esc(motivo)}</p>
+      ${liga.portal ? `<p style="margin:18px 0 0"><a href="${esc(liga.portal)}"
+         style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
+         border-radius:8px;display:inline-block;font-weight:600">Abrir y corregir</a></p>` : ''}
+      <p style="margin:22px 0 0;font-size:12px;color:#888">
+         Enviado automáticamente por el Portal de Formatos de Sipnology</p>
+    </div>`;
+  const r = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method:'POST',
+    headers:Object.assign({}, H, {'Content-Type':'application/json'}),
+    body:JSON.stringify({message:{
+      subject:`Solicitud ${S.folio} devuelta`,
+      body:{contentType:'HTML', content:cuerpo},
+      toRecipients:[{emailAddress:{address:para}}],
+    }, saveToSentItems:true}),
+  });
+  if(!r.ok) throw new Error('rechazo HTTP '+r.status);
 }
 
 /* ── Entrar en modo Administración ── */
@@ -4836,7 +5140,9 @@ function init(){
   // Repositorio SharePoint
   $('#btnRepoAbrir').onclick = repoAbrir;
   $('#btnAdmin').onclick     = activarModoAdmin;
-  $('#btnEnviar').onclick    = enviarAdministracion;
+  $('#btnEnviar').onclick    = enviarAutorizacion;
+  $('#btnAutorizar').onclick = autorizarSolicitud;
+  $('#btnRechazar').onclick  = rechazarSolicitud;
   // Navegación dentro del repositorio
   $('#navAtras').onclick     = navAtras;
   $('#navAdelante').onclick  = navAdelante;
