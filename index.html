@@ -1010,10 +1010,10 @@ licencia:{
 /* ───────────────────────── 3. VIÁTICOS ───────────────────────── */
 viaticos:{
   id:'viaticos', pre:'ANT',
-  nombre:'Solicitud de Anticipo de Gastos y/o Viáticos',
-  corto:'Viáticos',
+  nombre:'Solicitud de Anticipo, Viáticos, Transporte y Hospedaje',
+  corto:'Viáticos y Viajes',
   archivo:'Solicitud Viaticos',
-  desc:'Anticipo de gastos de viaje: transporte, hospedaje, alimentos y desglose de montos.',
+  desc:'Todo el viaje en una sola solicitud: anticipo o reembolso de gastos, vuelos, \n        autobuses y hospedaje. Sustituye a la solicitud de Vuelo y/o Hospedaje.',
   color:'#0E8A6B', colorBg:'#E7F6F1',
   icono:'<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
   version:'02', emision:'JULIO/2026', paginas:'1 de 1',
@@ -1089,6 +1089,8 @@ viaticos:{
          cond:{k:'transporte', tiene:'Avión'}},
         {k:'vi_destino',  l:'Destino', tipo:'text', w:6, ph:'PBC — Puebla',
          cond:{k:'transporte', tiene:'Avión'}},
+        {k:'vi_pnr',      l:'Clave de reservación (ida)', tipo:'text', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Avión'}, ph:'PNR / localizador'},
         {k:'vi_costo',    l:'Costo del vuelo de ida', tipo:'dinero', w:6, soloAdmin:1,
          cond:{k:'transporte', tiene:'Avión'},
          hint:'Lo captura Administración; suma al total de la solicitud.'},
@@ -1103,6 +1105,8 @@ viaticos:{
         {k:'vr_hlle',     l:'Hora de Llegada', tipo:'time', w:4, cond:{k:'transporte', tiene:'Avión'}},
         {k:'vr_origen',   l:'Origen',  tipo:'text', w:6, cond:{k:'transporte', tiene:'Avión'}},
         {k:'vr_destino',  l:'Destino', tipo:'text', w:6, cond:{k:'transporte', tiene:'Avión'}},
+        {k:'vr_pnr',      l:'Clave de reservación (regreso)', tipo:'text', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Avión'}, ph:'PNR / localizador'},
         {k:'vr_costo',    l:'Costo del vuelo de regreso', tipo:'dinero', w:6, soloAdmin:1,
          cond:{k:'transporte', tiene:'Avión'},
          hint:'Lo captura Administración; suma al total de la solicitud.'},
@@ -1131,6 +1135,8 @@ viaticos:{
            {k:'hlle',     l:'Hora de Llegada', tipo:'time', w:4},
            {k:'origen',   l:'Origen',  tipo:'text', w:6, ph:'GDL — Guadalajara'},
            {k:'destino',  l:'Destino', tipo:'text', w:6, ph:'TIJ — Tijuana'},
+           {k:'pnr',      l:'Clave de reservación', tipo:'text', w:6, soloAdmin:1,
+            ph:'PNR / localizador'},
            {k:'costo',    l:'Costo del vuelo', tipo:'dinero', w:6, soloAdmin:1},
          ]},
 
@@ -1149,6 +1155,8 @@ viaticos:{
          cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ai_destino',l:'Destino', tipo:'text', w:6, ph:'Puebla, Pue.',
          cond:{k:'transporte', tiene:'Autobús'}},
+        {k:'ai_reserva',l:'Clave del boleto (ida)', tipo:'text', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ai_costo',  l:'Costo del autobús de ida', tipo:'dinero', w:6, soloAdmin:1,
          cond:{k:'transporte', tiene:'Autobús'},
          hint:'Lo captura Administración; suma al total de la solicitud.'},
@@ -1164,6 +1172,8 @@ viaticos:{
         {k:'ar_hlle',   l:'Hora de Llegada',  tipo:'time', w:4, cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ar_origen', l:'Origen',  tipo:'text', w:6, cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ar_destino',l:'Destino', tipo:'text', w:6, cond:{k:'transporte', tiene:'Autobús'}},
+        {k:'ar_reserva',l:'Clave del boleto (regreso)', tipo:'text', w:6, soloAdmin:1,
+         cond:{k:'transporte', tiene:'Autobús'}},
         {k:'ar_costo',  l:'Costo del autobús de regreso', tipo:'dinero', w:6, soloAdmin:1,
          cond:{k:'transporte', tiene:'Autobús'},
          hint:'Lo captura Administración; suma al total de la solicitud.'},
@@ -1182,6 +1192,7 @@ viaticos:{
            {k:'hlle',    l:'Hora de Llegada', tipo:'time', w:4},
            {k:'origen',  l:'Origen',  tipo:'text', w:6},
            {k:'destino', l:'Destino', tipo:'text', w:6},
+           {k:'reserva', l:'Clave del boleto', tipo:'text', w:6, soloAdmin:1},
            {k:'costo',   l:'Costo del autobús', tipo:'dinero', w:6, soloAdmin:1},
          ]},
 
@@ -1207,6 +1218,9 @@ viaticos:{
          desde:'hospDel', hasta:'hospAl',
          cond:{k:'hospedaje', igual:'Sí'},
          hint:'Se calcula solo a partir de las fechas de entrada y salida.'},
+        {k:'hospConf',  l:'No. de confirmación',  tipo:'text', w:6, soloAdmin:1, req:1,
+         cond:{k:'hospedaje', igual:'Sí'},
+         hint:'Sin este dato no se puede cerrar la solicitud.'},
         {k:'hospCosto', l:'Costo del hospedaje',  tipo:'dinero', w:6, soloAdmin:1,
          cond:{k:'hospedaje', igual:'Sí'},
          hint:'Lo captura Administración; suma al total de la solicitud.'},
@@ -1224,6 +1238,7 @@ viaticos:{
            {k:'al',      l:'Hospedaje — Al',      tipo:'date',  w:4},
            {k:'noches',  l:'N.° de Noches',       tipo:'noches',w:4,
             desde:'del', hasta:'al'},
+           {k:'conf',    l:'No. de confirmación',  tipo:'text', w:6, soloAdmin:1, req:1},
            {k:'costo',   l:'Costo del hospedaje', tipo:'dinero', w:6, soloAdmin:1},
            {k:'obs',     l:'Observaciones',       tipo:'text',  w:12, ph:'Incluye desayuno'},
          ]},
@@ -1268,18 +1283,13 @@ viaticos:{
         {k:'adm_fechaAut',  l:'Fecha de Autorización',  tipo:'date',   w:4, req:1},
         {k:'adm_autorizo',  l:'Autorizó',               tipo:'text',   w:4, req:1},
 
-        /* Los importes NO viven aquí: cada vuelo, autobús y hospedaje lleva
-           su propia casilla de costo. Tenerlos en dos lugares permitiría
-           capturar el mismo monto dos veces e inflar el total. */
-        {tipo:'sub', l:'Transporte Adquirido'},
-        {k:'adm_aerolinea', l:'Aerolínea',              tipo:'text',   w:4},
-        {k:'adm_numVuelo',  l:'No. de Vuelo',           tipo:'text',   w:4},
-        {k:'adm_pnr',       l:'Clave de Reservación',   tipo:'text',   w:4, ph:'PNR / localizador'},
-        {k:'adm_busLinea',  l:'Línea de Autobús',       tipo:'text',   w:6},
-
-        {tipo:'sub', l:'Hospedaje Confirmado'},
-        {k:'adm_hotel',     l:'Hotel Reservado',        tipo:'text',   w:6},
-        {k:'adm_hotelConf', l:'No. de Confirmación',    tipo:'text',   w:6},
+        /* Ni los importes ni las reservaciones viven aquí: cada vuelo,
+           autobús y hospedaje lleva sus propias casillas, capturadas donde
+           está el tramo que las genera. Un segundo juego de campos sueltos
+           no alcanzaría para un viaje con escalas, y en cuanto alguien
+           corrigiera el tramo original los dos dejarían de coincidir. */
+        {tipo:'nota', l:'Los datos y costos de cada vuelo, autobús y hospedaje se '+
+           'capturan en sus apartados correspondientes, junto al tramo que les toca.'},
 
         {k:'adm_obs', l:'Observaciones de Administración', tipo:'area', w:12, rows:2},
       ]},
@@ -1330,6 +1340,10 @@ viaticos:{
 
 /* ───────────────────────── 4. VUELO / HOSPEDAJE ───────────────────────── */
 vuelo:{
+  /* RETIRADA DEL MENÚ — la solicitud de Viáticos ya cubre estos casos.
+     El esquema se conserva íntegro para poder abrir los expedientes ya
+     archivados y para poder reactivarla quitando esta sola línea. */
+  oculto:1,
   id:'vuelo', pre:'SHP',
   nombre:'Solicitud de Vuelo y/o Hospedaje',
   corto:'Vuelo y Hospedaje',
@@ -1623,6 +1637,105 @@ responsiva:{
   ]
 },
 
+/* ───────────────────────── 6. VACACIONES ─────────────────────────
+   Sustituye al formato de Excel. La tabla de días por antigüedad que
+   traía era la anterior a la reforma de Vacaciones Dignas (6 días el
+   primer año); aquí se calcula con el Art. 76 vigente.              */
+vacaciones:{
+  id:'vacaciones', pre:'VAC',
+  nombre:'Solicitud y Autorización de Vacaciones',
+  corto:'Vacaciones',
+  archivo:'Solicitud Vacaciones',
+  desc:'Días de vacaciones por antigüedad, período a disfrutar y saldo pendiente. '+
+       'Los días que corresponden se calculan conforme al Art. 76 de la LFT.',
+  color:'#7A4BC4', colorBg:'#F0EAFB',
+  icono:'<path d="M8 21s-4-3-4-9a4 4 0 018 0c0 6-4 9-4 9z"/><path d="M12 12h9"/>'+
+        '<path d="M16 8l5 4-5 4"/>',
+  version:'01', emision:'JULIO/2026', paginas:'1 de 1',
+  // Mismo flujo que Viáticos: el jefe autoriza y Administración da el Vo. Bo.
+  subeRepo:1, dosEtapas:1, adminSiempre:1,
+  firmas:{ solicitante:'FIRMA DE CONFORMIDAD DEL EMPLEADO',
+           autoriza:['Gerente de Área / Director','Dirección General','Vo. Bo. Administración'] },
+  notaLegal:'Las vacaciones se otorgan conforme al Artículo 76 de la Ley Federal del Trabajo. '+
+    'Los días señalados son días laborables: no cuentan los descansos semanales ni los días '+
+    'de descanso obligatorio comprendidos en el período. El disfrute queda sujeto a la '+
+    'autorización del jefe directo y a las necesidades operativas del área. La prima '+
+    'vacacional se cubre conforme al Artículo 80 de la LFT.',
+  secciones:[
+    { t:'Datos del Colaborador', d:'Quién solicita y quién autoriza',
+      campos:[
+        {k:'solicitante', l:'Nombre del Colaborador', tipo:'text', w:6, req:1},
+        {k:'numEmpleado', l:'No. de Empleado',        tipo:'text', w:6},
+        {k:'area',        l:'Área y/o Departamento',  tipo:'sel',  w:6, req:1, op:DEPTOS},
+        {k:'puesto',      l:'Cargo',                  tipo:'text', w:6, req:1},
+
+        /* A este correo llega la liga y contra él se comprueba quién autoriza */
+        {k:'jefeNombre',  l:'Jefe Directo',           tipo:'text', w:6, req:1,
+         hint:'Quien autoriza esta solicitud.'},
+        {k:'jefeCorreo',  l:'Correo del Jefe Directo',tipo:'mail', w:6, req:1,
+         ph:'nombre.apellido@sipnology.com.mx',
+         hint:'A este correo llega la liga para autorizar.'},
+
+        {k:'fechaIngreso',l:'Fecha de Ingreso',       tipo:'date', w:6, req:1,
+         hint:'De aquí sale la antigüedad y los días que te corresponden.'},
+        {k:'fecha',       l:'Fecha de Solicitud',     tipo:'date', w:6, req:1, hoy:1},
+      ]},
+
+    { t:'Días que Corresponden', d:'Se calculan con la fecha de ingreso; no se capturan',
+      banner:'ANTIGÜEDAD Y DÍAS DE VACACIONES',
+      campos:[
+        {k:'antiguedad', l:'Antigüedad (años cumplidos)', tipo:'derivado', w:4,
+         calc:'antiguedad', desde:'fechaIngreso', hasta:'vacDel',
+         hint:'Años cumplidos al inicio del período solicitado.'},
+        {k:'diasCorresponden', l:'Días que Corresponden', tipo:'derivado', w:4,
+         calc:'diasLFT', de:'antiguedad',
+         hint:'Art. 76 LFT: 12 días al primer año, +2 por año hasta 20, después +2 por quinquenio.'},
+        {k:'diasDisfrutar', l:'Días a Disfrutar', tipo:'entero', w:4, req:1, min:0,
+         hint:'Días laborables que tomarás en este período.'},
+        {k:'diasPendientes', l:'Días Pendientes', tipo:'derivado', w:4,
+         calc:'resta', a:'diasCorresponden', b:'diasDisfrutar',
+         hint:'Saldo que queda del ejercicio.'},
+        {k:'ejercicioDel', l:'Ejercicio — del Año', tipo:'entero', w:4, ph:'2025'},
+        {k:'ejercicioAl',  l:'Ejercicio — al Año',  tipo:'entero', w:4, ph:'2026'},
+
+        {tipo:'nota',
+         l:'Los días señalados son días laborables. Los descansos semanales y los días de '+
+           'descanso obligatorio que caigan dentro del período no se descuentan del saldo.'},
+      ]},
+
+    { t:'Período a Disfrutar', d:'Agrega un bloque por cada período separado',
+      campos:[
+        {k:'vacDel', l:'Del', tipo:'date', w:6, req:1},
+        {k:'vacAl',  l:'Al',  tipo:'date', w:6, req:1},
+
+        /* Vacaciones partidas: cada botón agrega otro tramo de fechas */
+        {k:'periodosExtra', tipo:'bloques', w:12,
+         titulo:'Período Adicional', btn:'Agregar período',
+         campos:[
+           {k:'del',  l:'Del',  tipo:'date', w:6},
+           {k:'al',   l:'Al',   tipo:'date', w:6},
+           {k:'dias', l:'Días laborables', tipo:'entero', w:6},
+         ]},
+
+        {k:'lugar', l:'Lugar', tipo:'text', w:6, ph:'Zapopan, Jalisco'},
+        {k:'observaciones', l:'Observaciones', tipo:'area', w:12, rows:3},
+      ]},
+
+    /* ═══ Solo Administración: el Vo. Bo. que trae el formato original ═══ */
+    { t:'Vo. Bo. de Administración', d:'Confirmación del saldo y registro en nómina',
+      banner:'VISTO BUENO — ÁREA DE ADMINISTRACIÓN', soloAdmin:1,
+      campos:[
+        {k:'adm_diasAut',   l:'Días Autorizados',        tipo:'entero', w:4, req:1},
+        {k:'adm_saldo',     l:'Saldo Después del Goce',  tipo:'entero', w:4, req:1},
+        {k:'adm_fechaVoBo', l:'Fecha del Vo. Bo.',       tipo:'date',   w:4, req:1},
+        {k:'adm_quien',     l:'Otorga el Vo. Bo.',       tipo:'text',   w:6, req:1},
+        {k:'adm_primaPag',  l:'¿Prima vacacional pagada?', tipo:'radio', w:6,
+         op:['Sí','No','No aplica en este período']},
+        {k:'adm_obs', l:'Observaciones de Administración', tipo:'area', w:12, rows:2},
+      ]},
+  ]
+},
+
 };
 
 /* ───────────────────────────────────────────────────────────────────
@@ -1796,7 +1909,7 @@ function camposVisibles(sec){
 }
 /* ¿Es un campo que el usuario captura? (los derivados no cuentan) */
 function esCapturable(c){
-  return c.k && !['tabla','lista','calc','bloques','noches'].includes(c.tipo);
+  return c.k && !['tabla','lista','calc','bloques','noches','derivado'].includes(c.tipo);
 }
 
 /* ── Noches de hospedaje ───────────────────────────────────────────
@@ -1812,6 +1925,47 @@ function noches(desde, hasta){
   return dias < 0 ? null : dias;      // salida antes de entrada: dato inválido
 }
 
+/* ── Antigüedad y días de vacaciones ───────────────────────────────
+   Años cumplidos entre dos fechas. Se cuenta por aniversario, no
+   dividiendo días entre 365: quien entró el 1 de marzo no cumple un
+   año hasta el 1 de marzo siguiente, tenga el año bisiesto o no.    */
+function aniosCumplidos(ingreso, corte){
+  if(!ingreso) return null;
+  const a = new Date(ingreso + 'T00:00:00');
+  const b = new Date((corte || hoyISO()) + 'T00:00:00');
+  if(isNaN(a) || isNaN(b) || b < a) return null;
+  let n = b.getFullYear() - a.getFullYear();
+  const cumpleEsteAnio = new Date(b.getFullYear(), a.getMonth(), a.getDate());
+  if(b < cumpleEsteAnio) n--;
+  return Math.max(0, n);
+}
+
+/* Art. 76 LFT reformado — "Vacaciones Dignas", vigente desde 2023:
+   12 días al cumplir el primer año, +2 por año hasta 20 al quinto, y
+   después +2 por cada quinquenio. El formato de Excel que se venía
+   usando traía la tabla anterior (6 días el primer año). */
+function diasVacacionesLFT(anios){
+  const n = parseInt(anios, 10);
+  if(isNaN(n) || n < 1) return 0;          // sin un año cumplido no aplica
+  if(n <= 5) return 10 + n * 2;            // 12, 14, 16, 18, 20
+  return 20 + Math.ceil((n - 5) / 5) * 2;  // 22, 24, 26, 28, 30, 32…
+}
+
+/* Cada tipo derivado sabe calcularse a partir de otros campos */
+const DERIVADOS = {
+  noches    : c => noches(S.datos[c.desde], S.datos[c.hasta]),
+  antiguedad: c => aniosCumplidos(S.datos[c.desde], S.datos[c.hasta]),
+  diasLFT   : c => {
+    const d = diasVacacionesLFT(S.datos[c.de]);
+    return d || null;
+  },
+  resta     : c => {
+    const a = parseFloat(limpiaNum(S.datos[c.a]));
+    const b = parseFloat(limpiaNum(S.datos[c.b])) || 0;
+    return isNaN(a) ? null : (a - b);
+  },
+};
+
 /* Escribe el resultado en los datos para que llegue al PDF y al JSON,
    y refresca la casilla en pantalla si está visible. */
 function sincronizarNoches(){
@@ -1823,9 +1977,10 @@ function sincronizarNoches(){
 
   S.fmt.secciones.forEach(s => s.campos.forEach(c => {
 
-    if(c.tipo === 'noches'){
-      const n = noches(S.datos[c.desde], S.datos[c.hasta]);
-      if(n === null) delete S.datos[c.k]; else S.datos[c.k] = n;
+    const fn = DERIVADOS[c.tipo === 'noches' ? 'noches' : c.calc];
+    if(fn && (c.tipo === 'noches' || c.tipo === 'derivado')){
+      const n = fn(c);
+      if(n === null || n === undefined) delete S.datos[c.k]; else S.datos[c.k] = n;
       poner($(`[data-nfld="${c.k}"]`), n);
     }
 
@@ -1956,9 +2111,11 @@ function campoHTML(c){
         </div>`;
       break;
     }
-    /* Noches: se derivan de las fechas, no se capturan */
+    /* Se derivan de otros campos, no se capturan */
+    case 'derivado':
     case 'noches': {
-      const n = noches(S.datos[c.desde], S.datos[c.hasta]);
+      const fn = DERIVADOS[c.tipo === 'noches' ? 'noches' : c.calc];
+      const n = fn ? fn(c) : null;
       inp = `<input type="text" id="f_${c.k}" data-nfld="${c.k}" readonly tabindex="-1"
         value="${n===null?'':n}" placeholder="—"
         style="text-align:right;font-variant-numeric:tabular-nums;
@@ -2016,7 +2173,7 @@ function campoHTML(c){
      que el portal falló. Mejor decir cuál es el problema. */
   let hint = c.hint ? `<div class="hint">${esc(c.hint)}</div>` : '';
   if(c.tipo==='noches' && S.datos[c.desde] && S.datos[c.hasta] &&
-     noches(S.datos[c.desde], S.datos[c.hasta]) === null){
+     DERIVADOS.noches(c) === null){
     hint = `<div class="hint" style="color:var(--warn)">La fecha de salida es anterior `+
            `a la de entrada.</div>`;
   }
@@ -2042,14 +2199,14 @@ function tablaHTML(c){
           value="${esc(valor)}" placeholder="${dec?'0.00':'0'}"></td>`;
 
       if(col.tipo==='calc'){
-        // Filas de monto libre: el usuario captura el importe directamente
-        if(fila.libre) return celdaNum('mxn', rv.mxn ?? '', true);
-        const t = parseFloat(limpiaNum(rv.tarifa ?? fila.tarifa ?? 0))||0;
-        const d = parseFloat(limpiaNum(rv.dias ?? 0))||0;
-        return `<td class="cal" data-calc="${i}">${t*d?fMoney(t*d):'—'}</td>`;
+        /* Filas de monto libre: si capturó tarifa y días se multiplica igual
+           que en las demás; si no, se deja escribir el importe directo. Antes
+           solo permitía lo segundo, y quien viaja tres días con caseta diaria
+           tenía que hacer la cuenta de cabeza. */
+        const r = totalFila(fila, rv);
+        if(fila.libre && !r.calculado) return celdaNum('mxn', rv.mxn ?? '', true);
+        return `<td class="cal" data-calc="${i}">${r.mxn?fMoney(r.mxn):'—'}</td>`;
       }
-      if((col.k==='tarifa' || col.k==='dias') && fila.libre)
-        return `<td class="num" style="color:#B0B0B8;text-align:right;padding-right:12px">—</td>`;
 
       const val = rv[col.k] ?? (col.k==='tarifa' ? (fila.tarifa??'') : '');
       return celdaNum(col.k, val, col.tipo==='money');
@@ -2312,20 +2469,27 @@ function actualizarTablas(){
     const datos = S.datos[c.k] || {};
     let total = 0;
     c.filas.forEach((fila,i)=>{
-      const rv = datos[i] || {};
-      const t = parseFloat(limpiaNum(rv.tarifa ?? fila.tarifa ?? 0))||0;
-      const d = parseFloat(limpiaNum(rv.dias ?? 0))||0;
-      const manual = parseFloat(limpiaNum(rv.mxn ?? 0))||0;
-      const tot = fila.libre ? manual : t*d;
-      total += tot;
-      if(!fila.libre){
-        const cel = $(`[data-calc="${i}"]`);
-        if(cel) cel.textContent = tot ? fMoney(tot) : '—';
-      }
+      const r = totalFila(fila, datos[i]);
+      total += r.mxn;
+      const cel = $(`[data-calc="${i}"]`);
+      if(cel) cel.textContent = r.mxn ? fMoney(r.mxn) : '—';
     });
     const el = $('#tot_'+c.k);
     if(el) el.textContent = '$'+fNum(total);
   }));
+}
+
+/* ── Importe de una fila del desglose ───────────────────────────────
+   Regla única, usada por la tabla en pantalla, el total y el documento:
+   si hay tarifa y días se multiplican; si no, vale el importe capturado
+   a mano. Antes vivía repetida en tres lugares y ya empezaba a divergir. */
+function totalFila(fila, rv){
+  rv = rv || {};
+  const t = parseFloat(limpiaNum(rv.tarifa ?? fila.tarifa ?? 0)) || 0;
+  const d = parseFloat(limpiaNum(rv.dias ?? 0)) || 0;
+  if(t && d) return {mxn:t*d, calculado:true, tarifa:t, dias:d};
+  const manual = parseFloat(limpiaNum(rv.mxn ?? 0)) || 0;
+  return {mxn: fila.libre ? manual : 0, calculado:false, tarifa:t, dias:d};
 }
 
 function totalGastos(){
@@ -2334,13 +2498,7 @@ function totalGastos(){
   f.secciones.forEach(s=>s.campos.forEach(c=>{
     if(c.tipo!=='tabla') return;
     const datos = S.datos[c.k] || {};
-    c.filas.forEach((fila,i)=>{
-      const rv = datos[i] || {};
-      const t = parseFloat(limpiaNum(rv.tarifa ?? fila.tarifa ?? 0))||0;
-      const d = parseFloat(limpiaNum(rv.dias ?? 0))||0;
-      const manual = parseFloat(limpiaNum(rv.mxn ?? 0))||0;
-      total += fila.libre ? manual : t*d;
-    });
+    c.filas.forEach((fila,i)=>{ total += totalFila(fila, datos[i]).mxn; });
   }));
   return {mxn:total};
 }
@@ -2741,15 +2899,13 @@ function bloqueLista(c){
 function bloqueTabla(c){
   const datos = S.datos[c.k] || {};
   const filas = c.filas.map((fila,i)=>{
-    const rv = datos[i] || {};
-    const t = parseFloat(limpiaNum(rv.tarifa ?? fila.tarifa ?? 0))||0;
-    const dd= parseFloat(limpiaNum(rv.dias ?? 0))||0;
-    const manual = parseFloat(limpiaNum(rv.mxn ?? 0))||0;
-    const tot = fila.libre ? manual : t*dd;
+    // Misma regla que en pantalla: la tarifa y los días se imprimen si
+    // se usaron, sin importar si la fila es de monto libre.
+    const r = totalFila(fila, datos[i]);
     return [ fila.concepto, fila.desc,
-             fila.libre ? '' : (t?fMoney(t):''),
-             fila.libre ? '' : (dd?String(dd):''),
-             tot?fMoney(tot):'' ];
+             r.calculado ? fMoney(r.tarifa) : '',
+             r.calculado ? String(r.dias)   : '',
+             r.mxn ? fMoney(r.mxn) : '' ];
   });
   return {t:'tabla',
     heads:['CONCEPTO','DESCRIPCIÓN DEL GASTO','TARIFA\nMXN/DÍA','DÍAS /\nNOCHES','TOTAL\nMXN'],
@@ -3681,6 +3837,7 @@ const CARPETAS = {
   licencia     : 'Licencia',
   viaticos     : 'Viaticos',
   vuelo        : 'Vuelo y Hospedaje',
+  vacaciones   : 'Vacaciones',
 };
 
 let _msalApp = null;
@@ -4164,6 +4321,8 @@ function etapa(){
    pide reembolso y no necesita transporte ni hotel, no hay costos que
    asignar ni depósito que hacer: con la autorización del jefe basta. */
 function requiereAdministracion(){
+  // Hay formatos donde Administración siempre da el visto bueno
+  if(S.fmt && S.fmt.adminSiempre) return true;
   const d = S.datos || {};
   const t = Array.isArray(d.transporte) ? d.transporte : [];
   return t.includes('Avión') || t.includes('Autobús') ||
@@ -4718,6 +4877,21 @@ function validar(){
       faltan.push(c.l);
       if(primera<0) primera=o.i;
     }
+    /* Los tramos agregados también tienen obligatorios propios — el número
+       de confirmación del hotel, por ejemplo. Sin esto, un viaje con tres
+       hoteles se podía cerrar con dos sin confirmar. */
+    if(c.tipo==='bloques' && Array.isArray(S.datos[c.k])){
+      const reqs = c.campos.filter(x=>x.req && visible(x));
+      if(!reqs.length) return;
+      S.datos[c.k].forEach((rv,i)=>{
+        reqs.forEach(x=>{
+          if(!tieneValor((rv||{})[x.k])){
+            faltan.push(`${c.titulo} ${i+1} · ${x.l}`);
+            if(primera<0) primera=o.i;
+          }
+        });
+      });
+    }
   }));
   if(faltan.length){
     toast(`Faltan ${faltan.length} campo${faltan.length>1?'s':''} obligatorio${faltan.length>1?'s':''}: `+
@@ -5002,7 +5176,9 @@ $('.form-pane')?.addEventListener('scroll', ()=>{
 
 /* ── Home ── */
 function renderHome(){
-  $('#cards').innerHTML = Object.values(FORMATOS).map(f=>`
+  // Los formatos retirados siguen existiendo para abrir expedientes viejos,
+  // pero ya no se ofrecen para llenar uno nuevo.
+  $('#cards').innerHTML = Object.values(FORMATOS).filter(f=>!f.oculto).map(f=>`
     <button class="card" data-fmt="${f.id}" style="--cc:${f.color};--cc-bg:${f.colorBg}">
       <div class="card-top">
         <div class="card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
