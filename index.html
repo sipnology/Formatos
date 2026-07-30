@@ -4284,15 +4284,21 @@ function repoConfigRestaurar(){
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Correos que pueden completar la parte de Administración.
-   Durante las pruebas es una sola cuenta; se amplía al liberar. */
+   Fernando permanece mientras dure la prueba de funcionamiento. */
 const ADMINS_KEY = 'sip_admins_formatos';
-const ADMINS_DEFAULT = ['fernando.fernandez@sipnology.com.mx'];
+const ADMINS_DEFAULT = [
+  'miriam.gutierrez@sipnology.com.mx',
+  'sahira.bermudez@sipnology.com.mx',
+  'fernando.fernandez@sipnology.com.mx',
+];
 
-/* A quién se avisa cuando llega una solicitud nueva */
+/* A quién se avisa cuando una solicitud llega a Administración.
+   Va al mismo grupo: quien la completa es quien debe enterarse. */
 const AVISOS_KEY = 'sip_avisos_formatos';
 const AVISOS_DEFAULT = {
-  viaticos : ['fernando.fernandez@sipnology.com.mx'],
-  vuelo    : ['fernando.fernandez@sipnology.com.mx'],
+  viaticos   : ADMINS_DEFAULT.slice(),
+  vuelo      : ADMINS_DEFAULT.slice(),
+  vacaciones : ADMINS_DEFAULT.slice(),
 };
 
 /* ── Etapas del expediente ─────────────────────────────────────────
