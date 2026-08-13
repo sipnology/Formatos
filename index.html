@@ -1775,6 +1775,31 @@ vacaciones:{
   });
 })();
 
+/* ───────────────────────────────────────────────────────────────────
+   Nombre en tres partes, obligatorio en todos los formatos.
+   El folio se arma con las iniciales de nombre y los DOS apellidos, así
+   que dejarlo en un solo campo libre producía folios distintos según
+   quién capturara uno o dos apellidos. El nombre completo se sigue
+   armando solo para el documento, los correos y las cartas.
+   ─────────────────────────────────────────────────────────────────── */
+Object.values(FORMATOS).forEach(f=>{
+  const sec = f.secciones[0];
+  const i = sec.campos.findIndex(c => c.k === 'solicitante');
+  if(i < 0) return;
+  const etiqueta = sec.campos[i].l;
+  sec.campos.splice(i, 1,
+    {k:'nombres',   l:'Nombre(s)',        tipo:'text', w:4, req:1, noDoc:1},
+    {k:'apPaterno', l:'Apellido Paterno', tipo:'text', w:4, req:1, noDoc:1},
+    {k:'apMaterno', l:'Apellido Materno', tipo:'text', w:4, req:1, noDoc:1,
+     hint:'Ambos apellidos son obligatorios: el folio se forma con sus iniciales.'},
+    // Se arma solo; aparece en el documento, no en el formulario
+    // w:6 para que en el documento se empareje con el campo siguiente,
+    // igual que cuando era un campo capturable: el papel no cambia
+    {k:'solicitante', l:etiqueta, tipo:'derivado', calc:'nombreCompleto',
+     w:6, soloDoc:1}
+  );
+});
+
 Object.values(FORMATOS).forEach(f=>{
   f.secciones[0].campos.unshift({
     k:'folioNum', l:'N.° de Folio', tipo:'entero', w:3, noDoc:1, ph:'001',
@@ -1831,6 +1856,23 @@ function hoyISO(){
 
 /* ── Folio: iniciales del solicitante + consecutivo 3 dígitos ── */
 function iniciales(nombre){
+  const d = S.datos || {};
+
+  /* Con el nombre partido en tres, las iniciales son inequívocas:
+     primer nombre + apellido paterno + apellido materno. Antes se tomaba
+     la primera letra de cada palabra y se cortaba a tres, así que
+     "María José García Pérez" daba MJG en vez de MGP, y quien capturaba
+     un solo apellido terminaba con una X de relleno. */
+  if(d.apPaterno || d.apMaterno){
+    const ini = [String(d.nombres||'').trim().split(/\s+/)[0], d.apPaterno, d.apMaterno]
+      .map(x => String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+                             .trim().charAt(0).toUpperCase())
+      .join('');
+    return ini.length === 3 ? ini : (ini + 'XXX').slice(0,3);
+  }
+
+  /* Expedientes anteriores a la separación: se conserva el cálculo viejo
+     para que su folio no cambie al reabrirlos. */
   if(!nombre) return 'XXX';
   const stop = ['de','del','la','las','los','y','da','van','von','san'];
   const w = String(nombre).trim().split(/\s+/)
@@ -1900,10 +1942,13 @@ function toast(msg, tipo='ok', ms=3400){
 /* ── Visibilidad condicional de secciones y campos ──
    `cond`  → una condición
    `todas` → varias condiciones que deben cumplirse a la vez            */
-function visible(o){
-  // Las secciones de Administración solo existen en modo Administración
-  if(o.soloAdmin && !S.modoAdmin) return false;
-  if(o.todas) return o.todas.every(cc=>visible({cond:cc}));
+function visible(o, paraDoc){
+  // Las secciones de Administración solo se capturan en modo Administración,
+  // pero el documento las imprime siempre
+  if(o.soloAdmin && !S.modoAdmin && !paraDoc) return false;
+  // Campos que solo existen en el papel: se arman solos, no se capturan
+  if(o.soloDoc && !paraDoc) return false;
+  if(o.todas) return o.todas.every(cc=>visible({cond:cc}, paraDoc));
   const c = o.cond;
   if(!c) return true;
   const v = S.datos[c.k];
@@ -1920,7 +1965,9 @@ function seccionesVisibles(){
   return S.fmt.secciones.map((s,i)=>({s,i})).filter(o=>visible(o.s));
 }
 function camposVisibles(sec){
-  return sec.campos.filter(visible);
+  // Con `filter(visible)` el índice llegaría como segundo argumento y
+  // haría pasar por "documento" a todos los campos salvo el primero.
+  return sec.campos.filter(c => visible(c));
 }
 
 /* ── Visibilidad para el DOCUMENTO ──────────────────────────────────
@@ -1928,16 +1975,12 @@ function camposVisibles(sec){
    PDF respetara esa marca, el expediente cerrado saldría sin el visto
    bueno de Administración ni los costos que ella asignó — justo los
    datos que hacen falta para archivarlo o defenderlo.               */
-function visibleDoc(o){
-  const salvo = S.modoAdmin;
-  S.modoAdmin = true;               // el papel lo ve todo
-  try{ return visible(o); } finally{ S.modoAdmin = salvo; }
-}
+function visibleDoc(o){ return visible(o, true); }
 function seccionesDoc(){
   return S.fmt.secciones.map((s,i)=>({s,i})).filter(o=>visibleDoc(o.s));
 }
 function camposDoc(sec){
-  return sec.campos.filter(visibleDoc);
+  return sec.campos.filter(c => visibleDoc(c));
 }
 /* ¿Es un campo que el usuario captura? (los derivados no cuentan) */
 function esCapturable(c){
@@ -1991,6 +2034,14 @@ const DERIVADOS = {
     const d = diasVacacionesLFT(S.datos[c.de]);
     return d || null;
   },
+  /* El nombre completo se arma de las tres partes. Si aún no hay ninguna
+     —expediente viejo— se conserva lo que ya venía, para no borrarlo. */
+  nombreCompleto: c => {
+    const d = S.datos;
+    const partes = [d.nombres, d.apPaterno, d.apMaterno]
+      .map(x => String(x||'').trim()).filter(Boolean);
+    return partes.length ? partes.join(' ') : (d.solicitante || null);
+  },
   resta     : c => {
     const a = parseFloat(limpiaNum(S.datos[c.a]));
     const b = parseFloat(limpiaNum(S.datos[c.b])) || 0;
@@ -2018,7 +2069,7 @@ function sincronizarNoches(){
 
     // Los hospedajes adicionales llevan su propio par de fechas
     if(c.tipo === 'bloques' && Array.isArray(S.datos[c.k])){
-      const sub = c.campos.filter(x => x.tipo === 'noches');
+      const sub = c.campos.filter(x => x.tipo === 'noches' || x.tipo === 'derivado');
       if(!sub.length) return;
       S.datos[c.k].forEach((rv, i) => {
         if(!rv) return;
@@ -2583,6 +2634,11 @@ function opcionesLista(c){
 }
 
 function buildDoc(){
+  /* El nombre completo, las noches y los días de vacaciones se derivan de
+     otros campos. El documento puede armarse sin haber pasado por el
+     formulario —al descargar desde el repositorio, por ejemplo— así que
+     se recalculan aquí antes de leer nada. */
+  sincronizarNoches();
   const f = S.fmt, d = S.datos, B = [];
 
   // El pie se repite en cada hoja: se emite antes de cada salto y al final
@@ -4913,6 +4969,24 @@ function abrirFormato(id, datos){
     if(c.hoy && !S.datos[c.k]) S.datos[c.k]=hoyISO();
     if(c.tipo==='check' && !Array.isArray(S.datos[c.k])) S.datos[c.k]=S.datos[c.k]?[S.datos[c.k]]:[];
   }));
+
+  /* Expedientes guardados antes de separar el nombre: se reparte en las
+     tres casillas tomando los dos últimos términos como apellidos. Es
+     una propuesta, no un dato definitivo — quedan editables y son
+     obligatorios, así que quien reabra la solicitud los revisa. */
+  if(S.datos.solicitante && !S.datos.nombres && !S.datos.apPaterno && !S.datos.apMaterno){
+    const p = String(S.datos.solicitante).trim().split(/\s+/).filter(Boolean);
+    if(p.length >= 3){
+      S.datos.apMaterno = p.pop();
+      S.datos.apPaterno = p.pop();
+      S.datos.nombres   = p.join(' ');
+    }else if(p.length === 2){
+      S.datos.apPaterno = p[1];
+      S.datos.nombres   = p[0];
+    }else if(p.length === 1){
+      S.datos.nombres   = p[0];
+    }
+  }
 
   // Sugerir el siguiente consecutivo; el solicitante puede sobrescribirlo
   if(!tieneValor(S.datos.folioNum))
