@@ -11,17 +11,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js"></script>
 <style>
+/* Paleta tomada del Cotizador (sipnology.github.io/cotizador) para que
+   los dos aplicativos se vean del mismo sistema. Todo el portal se pinta
+   con estas variables, así que el tema vive aquí y no repartido. */
 :root{
-  --or:#E05C14; --or-l:#FAD7C2; --or-d:#B34A10; --or-soft:#FEF3EC;
-  --ink:#1A1A1A; --ink-2:#4A4A4A; --ink-3:#7A7A7A;
-  --line:#E4E4E7; --line-2:#F0F0F2;
-  --bg:#F7F7F8; --card:#FFFFFF;
-  --ok:#159A5B; --warn:#C77700; --err:#C62828;
+  --or:#E8632A; --or-l:#26314f; --or-d:#F0B45A; --or-soft:#1e293b;
+  --ink:#e8edf7; --ink-2:#b9c3d8; --ink-3:#93a0bd;
+  --line:#26314f; --line-2:#1c2540;
+  --bg:#0f172a; --card:#16213e;
+  --panel:#111c33; --chip:#1e293b; --acc:#3b82f6;
+  --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
   --r:10px; --r-lg:16px;
-  --sh-1:0 1px 2px rgba(16,16,20,.06), 0 1px 3px rgba(16,16,20,.05);
-  --sh-2:0 2px 4px rgba(16,16,20,.05), 0 8px 20px rgba(16,16,20,.07);
-  --sh-3:0 8px 16px rgba(16,16,20,.07), 0 24px 48px rgba(16,16,20,.10);
-  --ff:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+  --sh-1:0 1px 2px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
+  --sh-2:0 2px 4px rgba(0,0,0,.30), 0 8px 20px rgba(0,0,0,.35);
+  --sh-3:0 8px 16px rgba(0,0,0,.35), 0 24px 48px rgba(0,0,0,.45);
+  --ff:-apple-system,'Segoe UI',BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -33,16 +37,24 @@ a{color:var(--or);text-decoration:none}
 ::selection{background:var(--or-l);color:var(--or-d)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#D4D4D8;border-radius:6px;border:2px solid var(--bg)}
-::-webkit-scrollbar-thumb:hover{background:#B4B4BB}
+::-webkit-scrollbar-thumb{background:#2f3b5c;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3d4a6e}
 
 /* ══ TOP BAR ══ */
-.topbar{position:sticky;top:0;z-index:60;height:60px;background:rgba(255,255,255,.88);
+.topbar{position:sticky;top:0;z-index:60;height:60px;background:var(--panel);
   backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:16px;padding:0 22px}
-.tb-logo{height:30px;display:flex;align-items:center;cursor:pointer;flex-shrink:0}
-.tb-logo svg{height:30px;width:auto;display:block}
+.tb-logo{height:32px;display:flex;align-items:center;cursor:pointer;flex-shrink:0}
+/* El logo va incrustado como PNG con transparencia; se sirve a 4× del
+   tamaño en pantalla para que se vea nítido en Retina. */
+.tb-logo img,.tb-logo svg{height:32px;width:auto;display:block}
 .tb-div{width:1px;height:24px;background:var(--line);flex-shrink:0}
+/* Marca del encabezado, con el mismo peso y color en las dos palabras */
+.tb-marca{display:flex;align-items:center;gap:13px;flex-shrink:0;cursor:pointer}
+.tb-m1,.tb-m2{font-size:19px;font-weight:800;color:var(--or);letter-spacing:.6px;
+  white-space:nowrap}
+.tb-mdiv{width:1px;height:21px;background:var(--line)}
+@media(max-width:720px){.tb-m2,.tb-mdiv{display:none}}
 .tb-title{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .tb-sub{font-size:11.5px;color:var(--ink-3);margin-top:1px}
@@ -54,14 +66,14 @@ a{color:var(--or);text-decoration:none}
   padding:0 15px;border-radius:var(--r);font-size:13.5px;font-weight:550;
   border:1px solid transparent;transition:.14s cubic-bezier(.4,0,.2,1);white-space:nowrap}
 .btn svg{width:15px;height:15px;flex-shrink:0}
-.btn-p{background:var(--or);color:#fff;box-shadow:0 1px 2px rgba(224,92,20,.3)}
-.btn-p:hover{background:#CF5411;box-shadow:0 2px 8px rgba(224,92,20,.35)}
-.btn-p:active{background:var(--or-d);transform:translateY(.5px)}
+.btn-p{background:var(--or);color:#fff;box-shadow:0 1px 2px rgba(232,99,42,.35)}
+.btn-p:hover{background:#F07A45;box-shadow:0 2px 10px rgba(232,99,42,.45)}
+.btn-p:active{background:#CF5411;transform:translateY(.5px)}
 .btn-s{background:var(--card);color:var(--ink);border-color:var(--line);box-shadow:var(--sh-1)}
-.btn-s:hover{background:#FAFAFB;border-color:#D4D4D8}
-.btn-s:active{background:var(--line-2)}
+.btn-s:hover{background:#1d2b4d;border-color:#33406a}
+.btn-s:active{background:#141d33}
 .btn-g{background:transparent;color:var(--ink-2)}
-.btn-g:hover{background:rgba(0,0,0,.045);color:var(--ink)}
+.btn-g:hover{background:rgba(255,255,255,.07);color:var(--ink)}
 .btn-sm{height:31px;padding:0 11px;font-size:12.5px;border-radius:8px}
 .btn-sm svg{width:13px;height:13px}
 /* El botón sigue recibiendo el puntero para que se lea su title:
@@ -72,15 +84,7 @@ a{color:var(--or);text-decoration:none}
 .btn-ic.btn-sm{width:31px}
 
 /* ══ HOME ══ */
-.home{max-width:1060px;margin:0 auto;padding:56px 24px 80px}
-.hero{text-align:center;margin-bottom:48px}
-.hero-mark{width:76px;height:76px;margin:0 auto 22px;border-radius:20px;
-  background:linear-gradient(140deg,var(--or) 0%,#F07A38 100%);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 6px 14px rgba(224,92,20,.28),0 16px 40px rgba(224,92,20,.18)}
-.hero-mark svg{height:44px;width:auto}
-.hero h1{font-size:32px;font-weight:680;letter-spacing:-.028em;margin-bottom:9px}
-.hero p{font-size:15.5px;color:var(--ink-3);max-width:490px;margin:0 auto;line-height:1.6}
+.home{max-width:1060px;margin:0 auto;padding:40px 24px 80px}
 .sec-head{display:flex;align-items:baseline;gap:11px;margin-bottom:18px;font-size:11.5px;
   font-weight:660;color:var(--ink-3);letter-spacing:.09em;text-transform:uppercase}
 .sec-head::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -91,7 +95,7 @@ a{color:var(--or);text-decoration:none}
   transition:.18s cubic-bezier(.4,0,.2,1);text-align:left;display:block;width:100%}
 .card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;
   background:var(--cc,var(--or));opacity:0;transition:.18s}
-.card:hover{border-color:#D8D8DC;box-shadow:var(--sh-2);transform:translateY(-2px)}
+.card:hover{border-color:#3a4770;box-shadow:var(--sh-2);transform:translateY(-2px)}
 .card:hover::before{opacity:1}
 .card:active{transform:translateY(0)}
 .card-top{display:flex;align-items:flex-start;gap:13px;margin-bottom:13px}
@@ -113,7 +117,7 @@ a{color:var(--or);text-decoration:none}
 .drafts{margin-top:40px}
 .draft-row{display:flex;align-items:center;gap:13px;padding:12px 15px;background:var(--card);
   border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;transition:.14s;cursor:pointer}
-.draft-row:hover{border-color:#D8D8DC;box-shadow:var(--sh-1)}
+.draft-row:hover{border-color:#3a4770;box-shadow:var(--sh-1)}
 .draft-ic{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;
   align-items:center;justify-content:center;background:var(--or-soft);color:var(--or)}
 .draft-ic svg{width:15px;height:15px}
@@ -121,7 +125,7 @@ a{color:var(--or);text-decoration:none}
 .draft-t{font-size:13.5px;font-weight:590;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .draft-m{font-size:11.5px;color:var(--ink-3);margin-top:1px}
 .empty{text-align:center;padding:36px 20px;color:var(--ink-3);font-size:13px;
-  border:1px dashed var(--line);border-radius:var(--r-lg);background:rgba(255,255,255,.5)}
+  border:1px dashed var(--line);border-radius:var(--r-lg);background:rgba(255,255,255,.03)}
 /* ══ WORKSPACE ══ */
 .ws{display:none;height:calc(100vh - 60px)}
 .ws.on{display:grid;grid-template-columns:222px minmax(0,1fr) minmax(0,1fr)}
@@ -168,10 +172,10 @@ a{color:var(--or);text-decoration:none}
 .fld input,.fld select,.fld textarea{width:100%;padding:8.5px 11px;border:1px solid var(--line);
   border-radius:8px;background:var(--card);font-size:13.5px;transition:.13s;outline:none}
 .fld textarea{resize:vertical;min-height:74px;line-height:1.55;font-size:13px}
-.fld input:hover,.fld select:hover,.fld textarea:hover{border-color:#D4D4D8}
+.fld input:hover,.fld select:hover,.fld textarea:hover{border-color:#3a4770}
 .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--or);
   box-shadow:0 0 0 3px rgba(224,92,20,.11)}
-.fld input::placeholder,.fld textarea::placeholder{color:#B0B0B8}
+.fld input::placeholder,.fld textarea::placeholder{color:#6b7796}
 .fld select{appearance:none;cursor:pointer;padding-right:30px;
   background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237A7A7A' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 10px center;background-size:13px}
@@ -243,7 +247,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .note-box svg{width:14px;height:14px;flex-shrink:0;margin-top:1px}
 
 /* ══ PREVIEW ══ */
-.pv-pane{border-left:1px solid var(--line);background:#E9E9EC;display:flex;
+.pv-pane{border-left:1px solid var(--line);background:#0b1120;display:flex;
   flex-direction:column;overflow:hidden}
 .pv-bar{height:44px;padding:0 14px;display:flex;align-items:center;gap:9px;background:var(--card);
   border-bottom:1px solid var(--line);flex-shrink:0}
@@ -255,9 +259,17 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .pv-scroll{flex:1;overflow-y:scroll;overflow-x:auto;padding:18px;
   scrollbar-gutter:stable}
 .pv-holder{width:794px;margin:0 auto}
+/* La hoja representa papel impreso: su paleta es la del PDF y NO sigue el
+   tema de la aplicación. Al oscurecer el portal, las etiquetas heredaban
+   el azul del tema y se veían distintas al PDF ya generado. Redefinir las
+   variables aquí hace que todas las reglas .d-* de abajo resuelvan contra
+   el papel sin tocar ninguna de ellas. */
 .pv-page{width:794px;background:#fff;box-shadow:var(--sh-3);padding:32px 30px;
   font-family:Arial,Helvetica,sans-serif;color:#1E1E1E;font-size:9pt;
-  overflow:hidden}
+  overflow:hidden;
+  --or:#E05C14; --or-l:#FAD7C2; --or-d:#B34A10; --or-soft:#FEF3EC;
+  --ink:#1E1E1E; --ink-2:#4A4A4A; --ink-3:#7A7A7A;
+  --line:#CCCCCC; --line-2:#E4E4E7; --card:#FFFFFF}
 
 /* documento */
 .d-hd{display:flex;align-items:stretch;border:2px solid var(--or-d);margin-bottom:10px}
@@ -339,7 +351,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 
 /* ══ BOTTOM ACTION BAR ══ */
 .actbar{position:fixed;bottom:0;left:222px;right:0;height:62px;
-  background:rgba(255,255,255,.94);backdrop-filter:saturate(180%) blur(12px);
+  background:var(--panel);backdrop-filter:saturate(180%) blur(12px);
   border-top:1px solid var(--line);display:none;align-items:center;gap:10px;
   padding:0 30px;z-index:50}
 .actbar.on{display:flex}
@@ -362,7 +374,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .ov{position:fixed;inset:0;background:rgba(20,20,24,.42);backdrop-filter:blur(3px);
   z-index:150;display:none;align-items:center;justify-content:center;padding:22px}
 .ov.on{display:flex}
-.modal{background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-3);max-width:400px;
+.modal{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--sh-3);max-width:400px;
   width:100%;padding:24px;animation:min .22s cubic-bezier(.4,0,.2,1)}
 @keyframes min{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:none}}
 .modal h3{font-size:16.5px;font-weight:640;margin-bottom:8px;letter-spacing:-.015em}
@@ -415,21 +427,21 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .tog-f .ic svg{width:14px;height:14px}
 .tog-f input[type=text]{border:none;padding:0;background:transparent;font-size:12.5px;
   outline:none;width:100%;min-width:0;color:var(--ink)}
-.tog-f input[type=text]::placeholder{color:#B0B0B8}
+.tog-f input[type=text]::placeholder{color:#6b7796}
 .tog-f input[type=text]:disabled{color:var(--ink-3)}
 
 /* Área de vista previa */
-.firma-view{background:#E9E9EC;display:flex;flex-direction:column;overflow:hidden}
+.firma-view{background:#0b1120;display:flex;flex-direction:column;overflow:hidden}
 .firma-area{flex:1;overflow:auto;padding:26px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:14px}
 .firma-wrap{background-image:
-    linear-gradient(45deg,#D4D4D8 25%,transparent 25%),
-    linear-gradient(-45deg,#D4D4D8 25%,transparent 25%),
-    linear-gradient(45deg,transparent 75%,#D4D4D8 75%),
-    linear-gradient(-45deg,transparent 75%,#D4D4D8 75%);
+    linear-gradient(45deg,#2a3555 25%,transparent 25%),
+    linear-gradient(-45deg,#2a3555 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#2a3555 75%),
+    linear-gradient(-45deg,transparent 75%,#2a3555 75%);
   background-size:16px 16px;
   background-position:0 0,0 8px,8px -8px,-8px 0;
-  background-color:#EDEDEF;border-radius:14px;box-shadow:var(--sh-3);
+  background-color:#1a2440;border-radius:14px;box-shadow:var(--sh-3);
   overflow:hidden;max-width:100%}
 .firma-wrap canvas{display:block;max-width:100%;height:auto}
 .firma-note{font-size:11px;color:var(--ink-3);text-align:center;line-height:1.6;
@@ -454,7 +466,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .repo-ic{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;
   align-items:center;justify-content:center}
 .repo-ic svg{width:15px;height:15px}
-.repo-ic.carp{background:#FEF6E7;color:#C88A16}
+.repo-ic.carp{background:#3a2f14;color:#F0B45A}
 .repo-ic.arch{background:var(--or-soft);color:var(--or)}
 .repo-tx{flex:1;min-width:0}
 .repo-n{font-size:13px;font-weight:570;white-space:nowrap;overflow:hidden;
@@ -467,12 +479,12 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 /* Distintivo de estado */
 .repo-chip{display:inline-block;margin-left:8px;font-size:10px;font-weight:660;
   padding:2px 7px;border-radius:5px;letter-spacing:.04em;vertical-align:middle}
-.repo-chip.pend{background:#FEF3E7;color:#B36A00}
-.repo-chip.ok{background:#E7F6EE;color:#0F7A47}
+.repo-chip.pend{background:#3a2a12;color:#f59e0b}
+.repo-chip.ok{background:#14331f;color:#22c55e}
 /* Secciones exclusivas de Administración */
-.f-sec.adm .f-sec-n{background:#0F7A47}
+.f-sec.adm .f-sec-n{background:#22c55e}
 .f-sec.adm .f-sec-t::after{content:'solo Administración';margin-left:9px;font-size:10.5px;
-  font-weight:640;color:#0F7A47;background:#E7F6EE;padding:2px 8px;border-radius:5px;
+  font-weight:640;color:#22c55e;background:#14331f;padding:2px 8px;border-radius:5px;
   letter-spacing:.03em;vertical-align:middle}
 
 </style>
@@ -480,13 +492,16 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 <body>
 <!-- ══════════════ TOP BAR ══════════════ -->
 <header class="topbar">
-  <div class="tb-logo" id="tbLogo" title="Inicio"><svg xmlns="http://www.w3.org/2000/svg" width="1665" height="630" viewBox="0 0 1665 630"><path d="M 70.80 387.59 C66.55,389.81 60.82,389.31 54.88,386.21 C42.06,379.51 39.17,364.45 48.69,353.93 C53.16,348.98 57.47,347.59 65.87,348.41 C74.99,349.30 85.10,346.56 99.04,339.44 C124.91,326.20 141.63,307.87 150.45,283.05 C153.54,274.35 157.00,255.33 157.00,247.01 C157.00,236.85 154.21,225.16 149.92,217.38 C146.66,211.45 146.00,209.30 146.00,204.58 C146.00,197.82 147.50,194.59 152.88,189.73 C160.30,183.02 168.77,182.54 179.11,188.22 C184.65,191.27 184.97,191.32 190.27,190.14 C207.02,186.39 228.56,170.09 242.41,150.67 C248.36,142.34 255.20,127.84 258.39,116.80 C263.94,97.62 263.89,75.78 258.28,66.00 C249.76,51.14 249.61,50.77 249.55,44.03 C249.51,38.37 249.90,36.90 252.53,33.02 C256.89,26.55 261.88,24.04 270.36,24.02 C278.70,24.00 283.63,26.38 287.73,32.42 C290.16,36.00 290.50,37.43 290.47,44.00 C290.44,51.03 290.13,52.08 285.50,60.81 L 280.57 70.12 L 280.17 82.91 C279.08,117.78 291.64,149.49 317.25,176.55 C334.75,195.04 351.88,205.45 367.65,207.18 C377.54,208.27 382.33,210.33 386.80,215.43 C391.31,220.56 392.49,225.82 390.59,232.31 C388.62,239.03 386.76,241.56 381.17,245.10 C373.34,250.07 364.57,248.50 357.36,240.84 C355.63,239.00 352.37,233.59 350.11,228.81 C346.56,221.30 345.18,219.48 339.98,215.48 C330.85,208.46 314.19,201.38 298.50,197.87 C289.62,195.88 262.75,196.16 251.50,198.35 C223.08,203.88 208.55,210.33 195.18,223.35 C183.30,234.92 177.69,249.25 177.69,268.00 C177.70,296.29 190.37,315.13 217.84,327.70 C227.88,332.29 258.35,342.38 268.50,344.47 C279.61,346.75 283.07,349.18 287.04,357.50 C293.14,370.26 284.33,385.47 270.11,386.70 C262.30,387.38 254.82,383.50 250.37,376.46 C245.20,368.25 240.29,363.40 230.66,356.97 C206.91,341.11 185.09,334.55 156.50,334.66 C139.30,334.72 130.54,336.53 118.30,342.53 C101.08,350.97 88.43,361.99 82.11,374.04 C78.32,381.29 74.80,385.50 70.80,387.59 ZM 278.72 604.38 C270.91,608.87 263.04,608.52 255.70,603.35 C245.49,596.16 244.18,582.32 252.70,571.70 C255.72,567.95 257.65,561.07 259.04,549.08 C264.08,505.73 237.50,459.91 195.27,439.13 C184.53,433.85 179.31,432.59 171.45,433.40 C163.62,434.20 158.52,432.88 153.53,428.76 C142.68,419.82 143.63,402.33 155.36,395.09 C160.39,391.98 168.76,391.25 174.48,393.44 C179.53,395.37 185.55,401.68 186.51,406.04 C187.85,412.13 202.20,422.29 217.56,428.02 C233.40,433.93 248.16,436.80 267.00,437.65 C290.19,438.68 307.41,435.28 327.00,425.81 C335.82,421.54 338.71,419.51 345.06,413.11 C353.76,404.36 356.96,399.09 361.23,386.50 C363.81,378.87 364.29,375.90 364.38,367.00 C364.50,354.68 363.13,348.25 358.16,338.00 C351.71,324.66 331.17,306.61 311.50,297.00 C299.34,291.06 292.63,289.28 277.84,288.07 C264.21,286.96 261.77,286.13 256.22,280.70 C246.37,271.08 247.56,256.47 258.84,248.54 C262.64,245.88 263.99,245.50 269.84,245.54 C274.66,245.56 277.62,246.17 280.57,247.71 C284.62,249.85 292.00,257.12 292.00,258.98 C292.00,261.08 305.52,274.15 311.77,278.09 C324.53,286.16 343.86,294.06 360.92,298.20 C372.28,300.95 391.59,301.15 401.00,298.61 C412.59,295.48 429.98,284.87 440.45,274.54 C445.62,269.44 449.26,264.30 454.24,255.11 C457.98,248.18 463.13,244.91 471.22,244.31 C479.10,243.74 485.08,246.49 489.38,252.68 C494.85,260.56 494.26,271.15 487.96,278.31 C483.25,283.66 478.80,285.52 467.07,287.05 C452.89,288.89 431.63,296.69 419.30,304.58 C398.43,317.94 380.89,353.64 379.29,386.02 C378.63,399.53 380.24,406.92 385.02,412.37 C393.32,421.82 394.18,432.95 387.19,440.34 C381.25,446.61 375.44,447.50 366.40,443.50 C363.29,442.12 359.10,441.00 357.09,441.00 C334.81,441.00 302.12,467.83 287.04,498.50 C281.16,510.46 278.39,520.09 277.02,533.33 C275.49,548.09 278.36,567.56 282.58,571.06 C285.92,573.84 288.41,580.38 288.45,586.50 C288.50,594.20 284.90,600.82 278.72,604.38 ZM 1434.00 451.98 C1426.66,454.41 1404.35,455.61 1395.66,454.02 C1371.48,449.61 1357.00,436.43 1357.00,418.82 L 1357.00 415.00 L 1386.68 415.00 L 1387.86 418.93 C1389.23,423.51 1393.52,427.47 1398.78,429.02 C1411.46,432.74 1423.84,430.65 1431.89,423.41 C1439.10,416.93 1441.30,411.12 1441.81,397.25 C1442.03,391.06 1441.87,386.00 1441.44,386.00 C1441.02,386.00 1437.84,388.71 1434.39,392.03 C1424.90,401.14 1416.69,404.21 1402.08,404.10 C1377.83,403.91 1358.43,389.02 1352.50,366.04 C1351.41,361.80 1350.84,355.61 1350.85,348.04 C1350.88,329.50 1355.70,317.06 1366.86,306.69 C1377.64,296.68 1393.37,292.14 1410.57,294.07 C1420.42,295.17 1427.64,298.56 1434.87,305.46 C1438.07,308.51 1440.94,311.00 1441.25,311.00 C1441.56,311.00 1442.38,307.85 1443.07,304.00 L 1444.32 297.00 L 1472.00 297.00 L 1472.00 351.84 C1472.00,402.79 1471.86,407.22 1470.07,414.24 C1467.45,424.49 1463.81,431.30 1457.34,438.08 C1451.45,444.26 1444.15,448.61 1434.00,451.98 ZM 763.77 423.25 L 763.50 451.50 L 748.94 451.78 C740.94,451.93 734.07,451.74 733.69,451.36 C733.31,450.98 733.00,415.85 733.00,373.31 L 733.00 295.95 L 747.25 296.22 L 761.50 296.50 L 762.62 304.00 C763.24,308.12 763.80,311.71 763.87,311.97 C763.94,312.23 766.81,309.66 770.25,306.27 C777.74,298.86 784.73,295.44 795.30,293.96 C822.73,290.15 844.42,304.47 852.16,331.51 C854.05,338.10 854.45,341.87 854.43,353.00 C854.38,374.34 849.77,387.31 838.05,399.07 C828.74,408.41 816.89,413.00 802.07,413.00 C789.04,413.00 779.37,409.03 770.54,400.05 C767.81,397.27 765.23,395.00 764.80,395.00 C764.38,395.00 763.91,407.71 763.77,423.25 ZM 616.83 410.05 C608.39,412.47 582.81,413.57 572.54,411.96 C556.68,409.47 544.81,403.76 536.09,394.44 C528.85,386.69 526.01,379.83 525.25,368.25 L 524.72 360.00 L 557.00 360.00 L 557.02 363.75 C557.05,368.04 559.82,374.71 562.61,377.17 C576.29,389.26 612.09,387.94 619.43,375.08 C622.17,370.29 622.02,363.25 619.11,359.15 C615.23,353.70 608.36,351.03 584.00,345.50 C565.04,341.20 557.51,338.79 548.75,334.25 C539.11,329.25 533.65,324.06 529.79,316.22 C526.62,309.79 526.50,309.10 526.50,297.47 C526.50,285.52 526.54,285.32 530.27,277.78 C534.81,268.57 541.12,262.52 551.36,257.51 C563.70,251.48 569.16,250.49 590.00,250.54 C606.03,250.58 609.54,250.88 616.31,252.80 C636.27,258.49 647.73,269.47 651.55,286.59 C652.42,290.49 652.99,295.67 652.82,298.09 L 652.50 302.50 L 621.00 303.05 L 620.99 300.28 C620.98,292.16 616.47,284.30 609.92,280.96 C604.25,278.07 592.00,276.75 581.65,277.93 C572.10,279.01 566.54,281.38 562.63,286.03 C560.44,288.63 560.00,290.14 560.00,295.04 C560.00,300.48 560.28,301.21 563.62,304.55 C569.09,310.03 575.51,312.31 604.00,318.94 C638.45,326.96 652.10,337.53 655.07,358.51 C658.47,382.52 643.78,402.33 616.83,410.05 ZM 1284.22 411.99 C1255.03,416.21 1228.67,405.82 1217.00,385.49 C1210.41,374.01 1207.70,352.09 1210.93,336.50 C1212.94,326.85 1218.51,316.33 1225.12,309.72 C1239.85,294.99 1267.72,289.41 1293.55,296.01 C1318.98,302.52 1333.15,322.50 1333.25,352.00 C1333.29,364.78 1331.57,373.80 1327.43,382.57 C1319.88,398.52 1304.38,409.07 1284.22,411.99 ZM 1095.50 410.43 C1088.50,412.30 1068.77,413.25 1061.38,412.07 C1037.47,408.24 1020.16,393.09 1014.49,371.03 C1012.50,363.28 1012.23,345.08 1013.98,336.43 C1018.19,315.59 1034.42,299.73 1056.50,294.88 C1065.12,292.98 1086.91,293.25 1095.00,295.35 C1122.11,302.38 1136.28,322.17 1136.29,353.00 C1136.30,372.41 1131.57,385.41 1120.48,396.49 C1113.94,403.01 1105.41,407.77 1095.50,410.43 ZM 1546.44 448.75 L 1545.10 452.00 L 1512.78 452.00 L 1513.39 449.59 C1513.72,448.26 1517.37,439.06 1521.50,429.14 C1525.62,419.22 1529.00,410.48 1529.00,409.73 C1529.00,408.97 1527.48,404.79 1525.62,400.43 C1523.76,396.07 1515.16,375.40 1506.50,354.50 C1497.85,333.60 1489.02,312.36 1486.88,307.30 C1484.75,302.24 1483.00,297.84 1483.00,297.53 C1483.00,297.21 1490.53,297.08 1499.74,297.23 L 1516.49 297.50 L 1531.12 335.46 C1539.16,356.33 1546.19,373.56 1546.74,373.75 C1546.83,373.78 1546.92,373.81 1547.01,373.81 C1547.93,373.86 1548.99,371.11 1561.41,338.75 L 1561.51 338.50 C1566.79,324.75 1572.55,309.79 1574.30,305.25 L 1577.50 297.01 L 1593.25 297.00 C1601.91,297.00 1609.00,297.24 1609.00,297.53 C1609.00,297.83 1602.97,312.56 1595.61,330.28 C1579.57,368.89 1548.31,444.19 1546.44,448.75 ZM 907.00 372.50 L 906.50 409.50 L 891.94 409.78 C883.94,409.93 877.07,409.74 876.69,409.36 C876.31,408.98 876.01,392.88 876.02,373.58 C876.04,335.72 876.62,329.88 881.41,319.41 C884.50,312.67 892.41,304.18 898.91,300.64 C908.02,295.69 917.85,293.74 934.00,293.71 C950.04,293.67 959.88,295.63 969.24,300.73 C975.26,304.00 982.04,311.18 985.42,317.85 C990.51,327.90 990.97,332.39 990.99,372.75 L 991.00 410.00 L 961.11 410.00 L 960.81 373.25 L 960.50 336.50 L 957.78 331.34 C954.47,325.07 951.08,322.52 943.41,320.52 C936.05,318.60 931.93,318.61 924.50,320.54 C917.28,322.42 912.71,325.76 909.74,331.31 C907.57,335.38 907.49,336.58 907.00,372.50 ZM 1188.00 253.00 L 1188.00 410.00 L 1158.00 410.00 L 1158.00 253.00 ZM 1067.33 388.10 C1075.52,390.20 1089.06,387.06 1094.86,381.70 C1101.53,375.54 1105.01,365.71 1104.99,353.07 C1104.96,335.62 1099.68,325.36 1088.00,320.08 C1081.23,317.02 1067.29,317.17 1060.50,320.39 C1054.32,323.31 1049.81,327.96 1046.80,334.50 C1044.77,338.90 1044.50,341.05 1044.50,352.50 C1044.50,364.67 1044.68,365.89 1047.34,371.65 C1048.91,375.03 1051.38,378.93 1052.84,380.31 C1055.95,383.25 1062.82,386.94 1067.33,388.10 ZM 1262.67 387.63 C1268.92,389.39 1278.44,388.79 1284.11,386.27 C1290.84,383.30 1295.38,378.76 1298.60,371.78 C1301.29,365.96 1301.50,364.63 1301.50,353.50 C1301.50,339.34 1299.74,332.93 1294.12,326.71 C1288.55,320.52 1282.22,318.02 1272.12,318.01 C1261.31,318.00 1256.89,319.39 1251.03,324.66 C1244.20,330.80 1241.80,336.93 1241.21,349.81 C1240.25,370.57 1247.51,383.36 1262.67,387.63 ZM 783.40 386.22 C795.02,390.36 810.01,386.30 816.36,377.30 C821.71,369.70 823.26,364.55 823.36,354.00 C823.50,338.39 819.15,328.46 809.55,322.52 C805.32,319.91 803.52,319.45 796.24,319.14 C781.08,318.50 772.59,322.99 766.84,334.68 C763.64,341.19 763.50,341.95 763.50,353.01 C763.50,364.03 763.65,364.85 766.78,371.22 C770.55,378.87 775.64,383.46 783.40,386.22 ZM 707.00 295.95 L 707.00 410.00 L 676.98 410.00 L 677.24 353.25 L 677.50 296.50 ZM 1399.50 377.27 C1406.12,379.55 1419.98,379.15 1425.00,376.55 C1431.68,373.07 1435.87,368.94 1438.94,362.80 C1441.61,357.47 1442.00,355.64 1441.98,348.59 C1441.95,339.18 1440.21,334.45 1434.42,328.04 C1427.90,320.82 1424.27,319.50 1411.00,319.50 C1401.08,319.50 1398.94,319.80 1395.41,321.69 C1390.54,324.29 1385.33,329.97 1383.26,334.91 C1380.86,340.67 1380.46,352.64 1382.46,359.55 C1384.63,367.09 1391.91,374.66 1399.50,377.27 ZM 265.50 379.27 C266.60,379.54 267.83,379.82 268.23,379.88 C268.63,379.95 270.76,379.28 272.96,378.40 C280.47,375.39 283.52,365.81 279.18,358.80 C275.28,352.48 267.15,351.05 260.55,355.53 L 256.82 358.06 L 244.21 351.48 C225.08,341.50 196.86,324.39 189.47,318.30 C175.44,306.72 169.05,289.82 170.30,267.57 C171.04,254.39 174.04,242.91 180.13,230.04 C184.52,220.77 186.06,218.62 193.59,211.27 C198.54,206.44 207.64,199.26 215.33,194.11 C231.47,183.31 242.23,174.71 247.37,168.50 C257.33,156.48 265.53,140.20 270.26,123.10 C272.12,116.39 272.41,112.12 272.76,86.44 L 273.16 57.37 L 276.40 55.62 C280.74,53.29 283.00,49.17 283.00,43.58 C283.00,39.76 282.44,38.36 279.69,35.36 C276.94,32.36 275.54,31.66 271.44,31.28 C267.41,30.91 265.86,31.26 263.01,33.19 C256.08,37.90 254.80,46.42 260.11,52.47 C261.82,54.42 264.25,56.28 265.51,56.59 C267.71,57.14 267.83,57.71 268.51,70.43 C269.72,92.88 268.69,111.96 265.68,123.34 C260.33,143.51 247.79,164.24 234.28,175.25 C230.55,178.29 221.20,184.98 213.50,190.12 C193.97,203.16 183.03,214.13 176.71,227.00 C174.15,232.23 170.81,241.00 169.30,246.50 C166.85,255.39 166.54,258.22 166.52,272.00 C166.50,285.25 166.82,288.52 168.71,294.50 C173.14,308.54 180.72,318.03 195.39,327.92 C204.47,334.04 228.11,347.87 243.25,355.92 C254.79,362.05 255.00,362.23 255.00,365.63 C255.00,371.72 259.69,377.81 265.50,379.27 ZM 252.50 447.48 C258.55,448.44 267.40,448.82 279.50,448.63 C302.14,448.27 311.59,446.26 327.57,438.44 C341.11,431.81 352.09,422.18 360.47,409.59 C366.72,400.20 369.67,393.00 373.43,377.99 C377.61,361.28 380.77,352.40 387.48,338.50 C394.51,323.95 400.44,315.46 408.82,307.94 C411.95,305.14 425.38,296.31 438.67,288.33 L 462.84 273.82 L 465.85 276.04 C468.32,277.87 469.76,278.18 473.96,277.78 C480.03,277.19 483.49,274.43 485.18,268.81 C487.58,260.80 482.70,253.17 474.58,252.26 C465.44,251.23 459.51,256.48 459.64,265.50 L 459.72 270.58 L 435.69 285.04 C416.16,296.79 410.21,300.91 403.95,307.00 C388.68,321.85 378.22,342.65 369.86,374.83 C363.90,397.74 359.95,405.56 347.80,418.55 C337.08,430.01 323.32,437.68 305.41,442.18 C297.60,444.15 294.04,444.42 276.50,444.35 C258.84,444.29 254.98,443.97 243.50,441.59 C220.16,436.76 199.67,429.81 184.74,421.65 L 178.99 418.50 L 179.53 414.50 C180.23,409.44 177.77,404.39 173.10,401.27 C168.90,398.46 165.85,398.41 160.41,401.04 C150.79,405.70 150.70,418.19 160.24,424.01 C164.41,426.55 168.62,426.53 172.84,423.96 L 176.18 421.92 L 186.84 427.34 C204.74,436.44 227.99,443.57 252.50,447.48 ZM 699.68 281.06 C684.68,287.87 669.08,272.96 675.42,257.87 C681.53,243.33 702.92,243.76 708.57,258.53 C711.82,267.07 707.75,277.39 699.68,281.06 ZM 274.17 48.35 C270.34,51.81 264.00,49.21 264.00,44.17 C264.00,41.31 267.40,38.00 270.35,38.00 C275.31,38.00 277.89,44.98 274.17,48.35 ZM 272.17 370.35 C271.17,371.26 269.37,372.00 268.17,372.00 C265.45,372.00 262.00,368.65 262.00,366.00 C262.00,363.29 265.48,360.00 268.35,360.00 C273.31,360.00 275.89,366.98 272.17,370.35 Z" fill="#E9662D"/></svg></div>
-  <div class="tb-div"></div>
+  <div class="tb-logo" id="tbLogo" title="Inicio"><img src="data:image/png;base64,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" alt="Sipnology"></div>
+  <div class="tb-marca" id="tbMarca">
+    <span class="tb-m1">SIPNOLOGY</span>
+    <span class="tb-mdiv"></span>
+    <span class="tb-m2">FORMATOS</span>
+  </div>
   <div id="tbCtx" style="display:none;min-width:0;flex:0 1 auto">
     <div class="tb-title" id="tbTitle"></div>
     <div class="tb-sub" id="tbSub"></div>
   </div>
-  <div id="tbHomeTxt" class="tb-title" style="font-weight:600">Portal de Formatos</div>
   <div class="tb-spacer"></div>
   <div class="tb-actions">
     <button class="btn btn-g btn-sm" data-import title="Cargar una solicitud guardada">
@@ -514,13 +529,6 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 
 <!-- ══════════════ HOME ══════════════ -->
 <main class="home" id="home">
-  <div class="hero">
-    <div class="hero-mark"><svg xmlns="http://www.w3.org/2000/svg" width="1665" height="630" viewBox="0 0 1665 630"><path d="M 70.80 387.59 C66.55,389.81 60.82,389.31 54.88,386.21 C42.06,379.51 39.17,364.45 48.69,353.93 C53.16,348.98 57.47,347.59 65.87,348.41 C74.99,349.30 85.10,346.56 99.04,339.44 C124.91,326.20 141.63,307.87 150.45,283.05 C153.54,274.35 157.00,255.33 157.00,247.01 C157.00,236.85 154.21,225.16 149.92,217.38 C146.66,211.45 146.00,209.30 146.00,204.58 C146.00,197.82 147.50,194.59 152.88,189.73 C160.30,183.02 168.77,182.54 179.11,188.22 C184.65,191.27 184.97,191.32 190.27,190.14 C207.02,186.39 228.56,170.09 242.41,150.67 C248.36,142.34 255.20,127.84 258.39,116.80 C263.94,97.62 263.89,75.78 258.28,66.00 C249.76,51.14 249.61,50.77 249.55,44.03 C249.51,38.37 249.90,36.90 252.53,33.02 C256.89,26.55 261.88,24.04 270.36,24.02 C278.70,24.00 283.63,26.38 287.73,32.42 C290.16,36.00 290.50,37.43 290.47,44.00 C290.44,51.03 290.13,52.08 285.50,60.81 L 280.57 70.12 L 280.17 82.91 C279.08,117.78 291.64,149.49 317.25,176.55 C334.75,195.04 351.88,205.45 367.65,207.18 C377.54,208.27 382.33,210.33 386.80,215.43 C391.31,220.56 392.49,225.82 390.59,232.31 C388.62,239.03 386.76,241.56 381.17,245.10 C373.34,250.07 364.57,248.50 357.36,240.84 C355.63,239.00 352.37,233.59 350.11,228.81 C346.56,221.30 345.18,219.48 339.98,215.48 C330.85,208.46 314.19,201.38 298.50,197.87 C289.62,195.88 262.75,196.16 251.50,198.35 C223.08,203.88 208.55,210.33 195.18,223.35 C183.30,234.92 177.69,249.25 177.69,268.00 C177.70,296.29 190.37,315.13 217.84,327.70 C227.88,332.29 258.35,342.38 268.50,344.47 C279.61,346.75 283.07,349.18 287.04,357.50 C293.14,370.26 284.33,385.47 270.11,386.70 C262.30,387.38 254.82,383.50 250.37,376.46 C245.20,368.25 240.29,363.40 230.66,356.97 C206.91,341.11 185.09,334.55 156.50,334.66 C139.30,334.72 130.54,336.53 118.30,342.53 C101.08,350.97 88.43,361.99 82.11,374.04 C78.32,381.29 74.80,385.50 70.80,387.59 ZM 278.72 604.38 C270.91,608.87 263.04,608.52 255.70,603.35 C245.49,596.16 244.18,582.32 252.70,571.70 C255.72,567.95 257.65,561.07 259.04,549.08 C264.08,505.73 237.50,459.91 195.27,439.13 C184.53,433.85 179.31,432.59 171.45,433.40 C163.62,434.20 158.52,432.88 153.53,428.76 C142.68,419.82 143.63,402.33 155.36,395.09 C160.39,391.98 168.76,391.25 174.48,393.44 C179.53,395.37 185.55,401.68 186.51,406.04 C187.85,412.13 202.20,422.29 217.56,428.02 C233.40,433.93 248.16,436.80 267.00,437.65 C290.19,438.68 307.41,435.28 327.00,425.81 C335.82,421.54 338.71,419.51 345.06,413.11 C353.76,404.36 356.96,399.09 361.23,386.50 C363.81,378.87 364.29,375.90 364.38,367.00 C364.50,354.68 363.13,348.25 358.16,338.00 C351.71,324.66 331.17,306.61 311.50,297.00 C299.34,291.06 292.63,289.28 277.84,288.07 C264.21,286.96 261.77,286.13 256.22,280.70 C246.37,271.08 247.56,256.47 258.84,248.54 C262.64,245.88 263.99,245.50 269.84,245.54 C274.66,245.56 277.62,246.17 280.57,247.71 C284.62,249.85 292.00,257.12 292.00,258.98 C292.00,261.08 305.52,274.15 311.77,278.09 C324.53,286.16 343.86,294.06 360.92,298.20 C372.28,300.95 391.59,301.15 401.00,298.61 C412.59,295.48 429.98,284.87 440.45,274.54 C445.62,269.44 449.26,264.30 454.24,255.11 C457.98,248.18 463.13,244.91 471.22,244.31 C479.10,243.74 485.08,246.49 489.38,252.68 C494.85,260.56 494.26,271.15 487.96,278.31 C483.25,283.66 478.80,285.52 467.07,287.05 C452.89,288.89 431.63,296.69 419.30,304.58 C398.43,317.94 380.89,353.64 379.29,386.02 C378.63,399.53 380.24,406.92 385.02,412.37 C393.32,421.82 394.18,432.95 387.19,440.34 C381.25,446.61 375.44,447.50 366.40,443.50 C363.29,442.12 359.10,441.00 357.09,441.00 C334.81,441.00 302.12,467.83 287.04,498.50 C281.16,510.46 278.39,520.09 277.02,533.33 C275.49,548.09 278.36,567.56 282.58,571.06 C285.92,573.84 288.41,580.38 288.45,586.50 C288.50,594.20 284.90,600.82 278.72,604.38 ZM 1434.00 451.98 C1426.66,454.41 1404.35,455.61 1395.66,454.02 C1371.48,449.61 1357.00,436.43 1357.00,418.82 L 1357.00 415.00 L 1386.68 415.00 L 1387.86 418.93 C1389.23,423.51 1393.52,427.47 1398.78,429.02 C1411.46,432.74 1423.84,430.65 1431.89,423.41 C1439.10,416.93 1441.30,411.12 1441.81,397.25 C1442.03,391.06 1441.87,386.00 1441.44,386.00 C1441.02,386.00 1437.84,388.71 1434.39,392.03 C1424.90,401.14 1416.69,404.21 1402.08,404.10 C1377.83,403.91 1358.43,389.02 1352.50,366.04 C1351.41,361.80 1350.84,355.61 1350.85,348.04 C1350.88,329.50 1355.70,317.06 1366.86,306.69 C1377.64,296.68 1393.37,292.14 1410.57,294.07 C1420.42,295.17 1427.64,298.56 1434.87,305.46 C1438.07,308.51 1440.94,311.00 1441.25,311.00 C1441.56,311.00 1442.38,307.85 1443.07,304.00 L 1444.32 297.00 L 1472.00 297.00 L 1472.00 351.84 C1472.00,402.79 1471.86,407.22 1470.07,414.24 C1467.45,424.49 1463.81,431.30 1457.34,438.08 C1451.45,444.26 1444.15,448.61 1434.00,451.98 ZM 763.77 423.25 L 763.50 451.50 L 748.94 451.78 C740.94,451.93 734.07,451.74 733.69,451.36 C733.31,450.98 733.00,415.85 733.00,373.31 L 733.00 295.95 L 747.25 296.22 L 761.50 296.50 L 762.62 304.00 C763.24,308.12 763.80,311.71 763.87,311.97 C763.94,312.23 766.81,309.66 770.25,306.27 C777.74,298.86 784.73,295.44 795.30,293.96 C822.73,290.15 844.42,304.47 852.16,331.51 C854.05,338.10 854.45,341.87 854.43,353.00 C854.38,374.34 849.77,387.31 838.05,399.07 C828.74,408.41 816.89,413.00 802.07,413.00 C789.04,413.00 779.37,409.03 770.54,400.05 C767.81,397.27 765.23,395.00 764.80,395.00 C764.38,395.00 763.91,407.71 763.77,423.25 ZM 616.83 410.05 C608.39,412.47 582.81,413.57 572.54,411.96 C556.68,409.47 544.81,403.76 536.09,394.44 C528.85,386.69 526.01,379.83 525.25,368.25 L 524.72 360.00 L 557.00 360.00 L 557.02 363.75 C557.05,368.04 559.82,374.71 562.61,377.17 C576.29,389.26 612.09,387.94 619.43,375.08 C622.17,370.29 622.02,363.25 619.11,359.15 C615.23,353.70 608.36,351.03 584.00,345.50 C565.04,341.20 557.51,338.79 548.75,334.25 C539.11,329.25 533.65,324.06 529.79,316.22 C526.62,309.79 526.50,309.10 526.50,297.47 C526.50,285.52 526.54,285.32 530.27,277.78 C534.81,268.57 541.12,262.52 551.36,257.51 C563.70,251.48 569.16,250.49 590.00,250.54 C606.03,250.58 609.54,250.88 616.31,252.80 C636.27,258.49 647.73,269.47 651.55,286.59 C652.42,290.49 652.99,295.67 652.82,298.09 L 652.50 302.50 L 621.00 303.05 L 620.99 300.28 C620.98,292.16 616.47,284.30 609.92,280.96 C604.25,278.07 592.00,276.75 581.65,277.93 C572.10,279.01 566.54,281.38 562.63,286.03 C560.44,288.63 560.00,290.14 560.00,295.04 C560.00,300.48 560.28,301.21 563.62,304.55 C569.09,310.03 575.51,312.31 604.00,318.94 C638.45,326.96 652.10,337.53 655.07,358.51 C658.47,382.52 643.78,402.33 616.83,410.05 ZM 1284.22 411.99 C1255.03,416.21 1228.67,405.82 1217.00,385.49 C1210.41,374.01 1207.70,352.09 1210.93,336.50 C1212.94,326.85 1218.51,316.33 1225.12,309.72 C1239.85,294.99 1267.72,289.41 1293.55,296.01 C1318.98,302.52 1333.15,322.50 1333.25,352.00 C1333.29,364.78 1331.57,373.80 1327.43,382.57 C1319.88,398.52 1304.38,409.07 1284.22,411.99 ZM 1095.50 410.43 C1088.50,412.30 1068.77,413.25 1061.38,412.07 C1037.47,408.24 1020.16,393.09 1014.49,371.03 C1012.50,363.28 1012.23,345.08 1013.98,336.43 C1018.19,315.59 1034.42,299.73 1056.50,294.88 C1065.12,292.98 1086.91,293.25 1095.00,295.35 C1122.11,302.38 1136.28,322.17 1136.29,353.00 C1136.30,372.41 1131.57,385.41 1120.48,396.49 C1113.94,403.01 1105.41,407.77 1095.50,410.43 ZM 1546.44 448.75 L 1545.10 452.00 L 1512.78 452.00 L 1513.39 449.59 C1513.72,448.26 1517.37,439.06 1521.50,429.14 C1525.62,419.22 1529.00,410.48 1529.00,409.73 C1529.00,408.97 1527.48,404.79 1525.62,400.43 C1523.76,396.07 1515.16,375.40 1506.50,354.50 C1497.85,333.60 1489.02,312.36 1486.88,307.30 C1484.75,302.24 1483.00,297.84 1483.00,297.53 C1483.00,297.21 1490.53,297.08 1499.74,297.23 L 1516.49 297.50 L 1531.12 335.46 C1539.16,356.33 1546.19,373.56 1546.74,373.75 C1546.83,373.78 1546.92,373.81 1547.01,373.81 C1547.93,373.86 1548.99,371.11 1561.41,338.75 L 1561.51 338.50 C1566.79,324.75 1572.55,309.79 1574.30,305.25 L 1577.50 297.01 L 1593.25 297.00 C1601.91,297.00 1609.00,297.24 1609.00,297.53 C1609.00,297.83 1602.97,312.56 1595.61,330.28 C1579.57,368.89 1548.31,444.19 1546.44,448.75 ZM 907.00 372.50 L 906.50 409.50 L 891.94 409.78 C883.94,409.93 877.07,409.74 876.69,409.36 C876.31,408.98 876.01,392.88 876.02,373.58 C876.04,335.72 876.62,329.88 881.41,319.41 C884.50,312.67 892.41,304.18 898.91,300.64 C908.02,295.69 917.85,293.74 934.00,293.71 C950.04,293.67 959.88,295.63 969.24,300.73 C975.26,304.00 982.04,311.18 985.42,317.85 C990.51,327.90 990.97,332.39 990.99,372.75 L 991.00 410.00 L 961.11 410.00 L 960.81 373.25 L 960.50 336.50 L 957.78 331.34 C954.47,325.07 951.08,322.52 943.41,320.52 C936.05,318.60 931.93,318.61 924.50,320.54 C917.28,322.42 912.71,325.76 909.74,331.31 C907.57,335.38 907.49,336.58 907.00,372.50 ZM 1188.00 253.00 L 1188.00 410.00 L 1158.00 410.00 L 1158.00 253.00 ZM 1067.33 388.10 C1075.52,390.20 1089.06,387.06 1094.86,381.70 C1101.53,375.54 1105.01,365.71 1104.99,353.07 C1104.96,335.62 1099.68,325.36 1088.00,320.08 C1081.23,317.02 1067.29,317.17 1060.50,320.39 C1054.32,323.31 1049.81,327.96 1046.80,334.50 C1044.77,338.90 1044.50,341.05 1044.50,352.50 C1044.50,364.67 1044.68,365.89 1047.34,371.65 C1048.91,375.03 1051.38,378.93 1052.84,380.31 C1055.95,383.25 1062.82,386.94 1067.33,388.10 ZM 1262.67 387.63 C1268.92,389.39 1278.44,388.79 1284.11,386.27 C1290.84,383.30 1295.38,378.76 1298.60,371.78 C1301.29,365.96 1301.50,364.63 1301.50,353.50 C1301.50,339.34 1299.74,332.93 1294.12,326.71 C1288.55,320.52 1282.22,318.02 1272.12,318.01 C1261.31,318.00 1256.89,319.39 1251.03,324.66 C1244.20,330.80 1241.80,336.93 1241.21,349.81 C1240.25,370.57 1247.51,383.36 1262.67,387.63 ZM 783.40 386.22 C795.02,390.36 810.01,386.30 816.36,377.30 C821.71,369.70 823.26,364.55 823.36,354.00 C823.50,338.39 819.15,328.46 809.55,322.52 C805.32,319.91 803.52,319.45 796.24,319.14 C781.08,318.50 772.59,322.99 766.84,334.68 C763.64,341.19 763.50,341.95 763.50,353.01 C763.50,364.03 763.65,364.85 766.78,371.22 C770.55,378.87 775.64,383.46 783.40,386.22 ZM 707.00 295.95 L 707.00 410.00 L 676.98 410.00 L 677.24 353.25 L 677.50 296.50 ZM 1399.50 377.27 C1406.12,379.55 1419.98,379.15 1425.00,376.55 C1431.68,373.07 1435.87,368.94 1438.94,362.80 C1441.61,357.47 1442.00,355.64 1441.98,348.59 C1441.95,339.18 1440.21,334.45 1434.42,328.04 C1427.90,320.82 1424.27,319.50 1411.00,319.50 C1401.08,319.50 1398.94,319.80 1395.41,321.69 C1390.54,324.29 1385.33,329.97 1383.26,334.91 C1380.86,340.67 1380.46,352.64 1382.46,359.55 C1384.63,367.09 1391.91,374.66 1399.50,377.27 ZM 265.50 379.27 C266.60,379.54 267.83,379.82 268.23,379.88 C268.63,379.95 270.76,379.28 272.96,378.40 C280.47,375.39 283.52,365.81 279.18,358.80 C275.28,352.48 267.15,351.05 260.55,355.53 L 256.82 358.06 L 244.21 351.48 C225.08,341.50 196.86,324.39 189.47,318.30 C175.44,306.72 169.05,289.82 170.30,267.57 C171.04,254.39 174.04,242.91 180.13,230.04 C184.52,220.77 186.06,218.62 193.59,211.27 C198.54,206.44 207.64,199.26 215.33,194.11 C231.47,183.31 242.23,174.71 247.37,168.50 C257.33,156.48 265.53,140.20 270.26,123.10 C272.12,116.39 272.41,112.12 272.76,86.44 L 273.16 57.37 L 276.40 55.62 C280.74,53.29 283.00,49.17 283.00,43.58 C283.00,39.76 282.44,38.36 279.69,35.36 C276.94,32.36 275.54,31.66 271.44,31.28 C267.41,30.91 265.86,31.26 263.01,33.19 C256.08,37.90 254.80,46.42 260.11,52.47 C261.82,54.42 264.25,56.28 265.51,56.59 C267.71,57.14 267.83,57.71 268.51,70.43 C269.72,92.88 268.69,111.96 265.68,123.34 C260.33,143.51 247.79,164.24 234.28,175.25 C230.55,178.29 221.20,184.98 213.50,190.12 C193.97,203.16 183.03,214.13 176.71,227.00 C174.15,232.23 170.81,241.00 169.30,246.50 C166.85,255.39 166.54,258.22 166.52,272.00 C166.50,285.25 166.82,288.52 168.71,294.50 C173.14,308.54 180.72,318.03 195.39,327.92 C204.47,334.04 228.11,347.87 243.25,355.92 C254.79,362.05 255.00,362.23 255.00,365.63 C255.00,371.72 259.69,377.81 265.50,379.27 ZM 252.50 447.48 C258.55,448.44 267.40,448.82 279.50,448.63 C302.14,448.27 311.59,446.26 327.57,438.44 C341.11,431.81 352.09,422.18 360.47,409.59 C366.72,400.20 369.67,393.00 373.43,377.99 C377.61,361.28 380.77,352.40 387.48,338.50 C394.51,323.95 400.44,315.46 408.82,307.94 C411.95,305.14 425.38,296.31 438.67,288.33 L 462.84 273.82 L 465.85 276.04 C468.32,277.87 469.76,278.18 473.96,277.78 C480.03,277.19 483.49,274.43 485.18,268.81 C487.58,260.80 482.70,253.17 474.58,252.26 C465.44,251.23 459.51,256.48 459.64,265.50 L 459.72 270.58 L 435.69 285.04 C416.16,296.79 410.21,300.91 403.95,307.00 C388.68,321.85 378.22,342.65 369.86,374.83 C363.90,397.74 359.95,405.56 347.80,418.55 C337.08,430.01 323.32,437.68 305.41,442.18 C297.60,444.15 294.04,444.42 276.50,444.35 C258.84,444.29 254.98,443.97 243.50,441.59 C220.16,436.76 199.67,429.81 184.74,421.65 L 178.99 418.50 L 179.53 414.50 C180.23,409.44 177.77,404.39 173.10,401.27 C168.90,398.46 165.85,398.41 160.41,401.04 C150.79,405.70 150.70,418.19 160.24,424.01 C164.41,426.55 168.62,426.53 172.84,423.96 L 176.18 421.92 L 186.84 427.34 C204.74,436.44 227.99,443.57 252.50,447.48 ZM 699.68 281.06 C684.68,287.87 669.08,272.96 675.42,257.87 C681.53,243.33 702.92,243.76 708.57,258.53 C711.82,267.07 707.75,277.39 699.68,281.06 ZM 274.17 48.35 C270.34,51.81 264.00,49.21 264.00,44.17 C264.00,41.31 267.40,38.00 270.35,38.00 C275.31,38.00 277.89,44.98 274.17,48.35 ZM 272.17 370.35 C271.17,371.26 269.37,372.00 268.17,372.00 C265.45,372.00 262.00,368.65 262.00,366.00 C262.00,363.29 265.48,360.00 268.35,360.00 C273.31,360.00 275.89,366.98 272.17,370.35 Z" fill="#FFFFFF"/></svg></div>
-    <h1>Formatos Sipnology</h1>
-    <p>Selecciona un formato, llena los campos y descarga el PDF listo para firma.
-       Todo se procesa en tu equipo.</p>
-  </div>
-
   <div class="sec-head">Formatos disponibles</div>
   <div class="grid" id="cards"></div>
 
@@ -534,7 +542,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 
   <div style="margin-top:44px" class="sec-head">Cómo funciona</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px" id="howto">
-    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px">
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px">
       <div style="width:30px;height:30px;border-radius:9px;background:var(--or-soft);color:var(--or);
         display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
         margin-bottom:11px">1</div>
@@ -542,7 +550,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       <div style="font-size:12.5px;color:var(--ink-3);line-height:1.5">Los campos se agrupan por
         secciones. El folio se genera solo con tus iniciales.</div>
     </div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px">
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px">
       <div style="width:30px;height:30px;border-radius:9px;background:var(--or-soft);color:var(--or);
         display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
         margin-bottom:11px">2</div>
@@ -550,7 +558,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       <div style="font-size:12.5px;color:var(--ink-3);line-height:1.5">El formato oficial se
         actualiza en tiempo real conforme escribes.</div>
     </div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px">
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px">
       <div style="width:30px;height:30px;border-radius:9px;background:var(--or-soft);color:var(--or);
         display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
         margin-bottom:11px">3</div>
@@ -3899,7 +3907,6 @@ function abrirFirma(){
   $('#actbar').classList.remove('on');
   $('#wsFirma').classList.add('on');
   $('#tbCtx').style.display = '';
-  $('#tbHomeTxt').style.display = 'none';
   $('#tbTitle').textContent = FIRMA.nombre;
   $('#tbSub').textContent = 'Herramienta · exporta PNG con transparencia';
   fiIniciar();
@@ -4954,7 +4961,6 @@ function irInicio(){
   $('#wsFirma').classList.remove('on');
   $('#actbar').classList.remove('on');
   $('#tbCtx').style.display='none';
-  $('#tbHomeTxt').style.display='';
   renderHome();
 }
 
@@ -4998,7 +5004,6 @@ function abrirFormato(id, datos){
   $('#ws').classList.add('on');
   $('#actbar').classList.add('on');
   $('#tbCtx').style.display='';
-  $('#tbHomeTxt').style.display='none';
   sincronizarCabecera();
   renderForm();
   $('.form-pane').scrollTop=0;
@@ -5351,11 +5356,10 @@ function renderHome(){
       <div class="card-top">
         <div class="card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${f.icono}</svg></div>
-        <div class="card-h"><h3>${esc(f.nombre)}</h3>
-          <span class="card-tag">${f.pre} · ${f.secciones.length} secciones</span></div>
+        <div class="card-h"><h3>${esc(f.nombre)}</h3></div>
       </div>
       <p>${esc(f.desc)}</p>
-      <div class="card-foot"><span>Versión ${f.version} · ${f.emision}</span>
+      <div class="card-foot"><span></span>
         <span class="card-go">Llenar
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
           stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -5471,6 +5475,7 @@ function init(){
   renderHome();
   $('#btnHome').onclick     = irInicio;
   $('#tbLogo').onclick      = irInicio;
+  $('#tbMarca').onclick     = irInicio;
   $('#btnPDF').onclick      = descargarPDF;
   $('#btnJSON').onclick     = descargarJSON;
   $('#btnVer').onclick      = abrirPDF;
