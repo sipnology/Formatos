@@ -1594,32 +1594,18 @@ responsiva:{
          cond:{k:'tipoAsignacion', igual:'Temporal'}, req:1},
       ]},
 
-    { t:'Equipo Asignado', d:'Características del equipo entregado',
+    { t:'Equipo Asignado', d:'Marca cada tipo entregado y captura sus datos',
       campos:[
-        {k:'tipoEquipo', l:'Tipo de Equipo', tipo:'radio', w:12, req:1,
-         op:['Computadora / Laptop','Teléfono / Tablet','Otro']},
+        /* Selección múltiple: una entrega puede incluir laptop y teléfono a
+           la vez, y cada uno necesita su propia serie, IMEI y accesorios.
+           Los campos de cada tipo se generan abajo, no se escriben a mano. */
+        {k:'tipoEquipo', l:'Tipos de Equipo Entregados', tipo:'check', w:12, req:1,
+         op:['Computadora / Laptop','Teléfono / Tablet','Monitor','Otro'],
+         hint:'Puedes marcar varios. Por cada uno se abre su propio apartado.'},
         {k:'tipoEquipoOtro', l:'Especifique el tipo de equipo', tipo:'text', w:12, req:1,
-         cond:{k:'tipoEquipo', igual:'Otro'}},
+         cond:{k:'tipoEquipo', tiene:'Otro'}},
 
-        {tipo:'sub', l:'Especificaciones'},
-        {k:'marca',  l:'Marca',        tipo:'text', w:4, req:1, ph:'ASUS'},
-        {k:'modelo', l:'Modelo',       tipo:'text', w:4, req:1, ph:'B5405CCA'},
-        {k:'serie',  l:'No. de Serie', tipo:'text', w:4, req:1},
-        {k:'imei',   l:'IMEI',         tipo:'text', w:4,
-         cond:{k:'tipoEquipo', igual:'Teléfono / Tablet'}},
-        {k:'sim',    l:'SIM',          tipo:'text', w:4,
-         cond:{k:'tipoEquipo', igual:'Teléfono / Tablet'}},
-        {k:'color',  l:'Color',        tipo:'text', w:4, ph:'Gris'},
-        {k:'estado', l:'Estado del Equipo', tipo:'radio', w:12, req:1,
-         op:['Nuevo','Usado / Refurbished']},
-
-        {tipo:'sub', l:'Accesorios Incluidos'},
-        {k:'accesorios', l:'Accesorios', tipo:'check', w:12,
-         op:['Cargador','Cable USB','Memoria USB','SIM Card','Mouse','Funda / Case']},
-        {k:'accesoriosOtro', l:'Otros accesorios', tipo:'text', w:12,
-         ph:'Adaptador HDMI, base enfriadora…'},
-
-        /* Un colaborador puede recibir varios equipos en la misma entrega */
+        /* Unidades adicionales del mismo tipo: se imprimen como tabla */
         {k:'equiposExtra', tipo:'bloques', w:12, comoTabla:1,
          titulo:'Equipo Adicional', btn:'Agregar equipo',
          campos:[
@@ -1790,6 +1776,55 @@ vacaciones:{
    quién capturara uno o dos apellidos. El nombre completo se sigue
    armando solo para el documento, los correos y las cartas.
    ─────────────────────────────────────────────────────────────────── */
+/* ───────────────────────────────────────────────────────────────────
+   Un apartado de datos por cada tipo de equipo marcado.
+   Se generan en código: agregar un tipo nuevo es una línea en TIPOS_EQ,
+   no copiar ocho campos y arriesgarse a que una clave quede repetida.
+   Las claves llevan prefijo por tipo (eq1_marca, eq2_marca…) para que
+   los datos de la laptop y los del teléfono no se pisen entre sí.
+   ─────────────────────────────────────────────────────────────────── */
+const TIPOS_EQ = [
+  {p:'eq1', op:'Computadora / Laptop', movil:false},
+  {p:'eq2', op:'Teléfono / Tablet',    movil:true },
+  {p:'eq3', op:'Monitor',              movil:false},
+  {p:'eq4', op:'Otro',                 movil:false},
+];
+
+(function apartadosPorTipo(){
+  const sec = FORMATOS.responsiva.secciones.find(s => s.t === 'Equipo Asignado');
+  if(!sec) return;
+  const i = sec.campos.findIndex(c => c.k === 'equiposExtra');
+  const nuevos = [];
+
+  TIPOS_EQ.forEach(T => {
+    const solo = {k:'tipoEquipo', tiene:T.op};   // visible solo si se marcó
+    const c = (o) => Object.assign({cond:solo}, o);
+
+    nuevos.push(
+      {tipo:'sub', l:T.op, cond:solo, grupo:'ini'},
+      c({k:T.p+'_marca',  l:'Marca',        tipo:'text', w:4, req:1}),
+      c({k:T.p+'_modelo', l:'Modelo',       tipo:'text', w:4, req:1}),
+      c({k:T.p+'_serie',  l:'No. de Serie', tipo:'text', w:4, req:1}),
+    );
+    if(T.movil) nuevos.push(
+      c({k:T.p+'_imei', l:'IMEI', tipo:'text', w:4}),
+      c({k:T.p+'_sim',  l:'SIM',  tipo:'text', w:4}),
+    );
+    nuevos.push(
+      c({k:T.p+'_color',  l:'Color', tipo:'text', w:4}),
+      c({k:T.p+'_estado', l:'Estado del Equipo', tipo:'radio', w:12, req:1,
+         op:['Nuevo','Usado / Refurbished']}),
+      c({k:T.p+'_acc',    l:'Accesorios', tipo:'check', w:12,
+         op:['Cargador','Cable USB','Memoria USB','SIM Card','Mouse','Funda / Case']}),
+      c({k:T.p+'_accOtro', l:'Otros accesorios', tipo:'text', w:12,
+         ph:'Adaptador HDMI, base enfriadora…'}),
+      {tipo:'marcaFin', cond:solo, grupo:'fin'},
+    );
+  });
+
+  sec.campos.splice(i, 0, ...nuevos);
+})();
+
 Object.values(FORMATOS).forEach(f=>{
   const sec = f.secciones[0];
   const i = sec.campos.findIndex(c => c.k === 'solicitante');
@@ -1992,7 +2027,7 @@ function camposDoc(sec){
 }
 /* ¿Es un campo que el usuario captura? (los derivados no cuentan) */
 function esCapturable(c){
-  return c.k && !['tabla','lista','calc','bloques','noches','derivado'].includes(c.tipo);
+  return c.k && !['tabla','lista','calc','bloques','noches','derivado','marcaFin'].includes(c.tipo);
 }
 
 /* ── Noches de hospedaje ───────────────────────────────────────────
@@ -2169,6 +2204,8 @@ function fmtDinero(s){
 /* ═══════════════════════ RENDER DEL FORMULARIO ═══════════════════════ */
 
 function campoHTML(c){
+  // Marcador de fin de grupo: solo existe para el salto de página del PDF
+  if(c.tipo === 'marcaFin') return '';
   if(c.tipo==='sub')
     return `<div class="sub-h"><span class="si">${c.ic||''}</span>${esc(c.l)}</div>`;
 
@@ -2674,7 +2711,16 @@ function buildDoc(){
     camposDoc(sec).forEach(c=>{
       // Sin pictogramas: ✈ y 🚌 no existen en Roboto y saldrían como
       // cuadros vacíos en el PDF, igual que pasaba con ☑ / ☐
-      if(c.tipo==='sub'){ flush(); B.push({t:'sub', txt:c.l}); return; }
+      /* Cada apartado de equipo se marca como grupo para que el PDF lo
+         mantenga entero: partir un equipo entre dos hojas deja la marca
+         en una y la serie en la otra. */
+      if(c.tipo==='marcaFin'){ flush(); B.push({t:'grupoFin'}); return; }
+      if(c.tipo==='sub'){
+        flush();
+        if(c.grupo==='ini') B.push({t:'grupoIni'});
+        B.push({t:'sub', txt:c.l});
+        return;
+      }
       if(c.tipo==='nota'){ flush(); B.push({t:'nota', txt:c.l}); return; }
       if(c.tipo==='tabla'){ flush(); B.push(bloqueTabla(c)); return; }
       if(c.tipo==='lista'){ flush(); const bl=bloqueLista(c); if(bl) B.push(bl); return; }
@@ -3114,6 +3160,8 @@ function blockHTML(b, pi, tot){
     return `<p class="${cls}">${html}</p>`;
   }
 
+  case 'grupoIni': case 'grupoFin': return '';
+
   case 'tablaSimple': {
     const th = b.heads.map(h=>`<th>${esc(h)}</th>`).join('');
     const tr = b.filas.map((f,i)=>`<tr${i%2?' class="alt"':''}>`+
@@ -3267,10 +3315,26 @@ function pdfBlocks(){
   PAD_V   = compacto() ? 2.5 : 3.5;
   PAD_OPT = compacto() ? 2.5 : 5;
   const B = buildDoc();
-  const out = [];
+  const salida = [];
+
+  /* Grupos que no deben partirse entre hojas. Mientras hay un grupo
+     abierto, los elementos se acumulan aparte y al cerrarlo se entregan
+     como un solo bloque indivisible. */
+  let grupo = null;
+  const out = {
+    push(el){ (grupo || salida).push(el); },
+  };
 
   B.forEach(b=>{
     switch(b.t){
+
+    case 'grupoIni': grupo = []; return;
+    case 'grupoFin':
+      if(grupo){
+        if(grupo.length) salida.push({stack:grupo, unbreakable:true});
+        grupo = null;
+      }
+      return;
 
     case 'break': out.push({text:'', pageBreak:'after'}); break;
 
@@ -3462,20 +3526,23 @@ function pdfBlocks(){
   /* Un banner nunca debe quedar solo (ni con una sola fila) al pie de página:
      arrastra consigo hasta los dos bloques siguientes en una pila indivisible.
      Se excluyen las tablas grandes, que ya repiten encabezado al paginar.   */
+  // Por si un grupo quedó abierto por un esquema mal formado
+  if(grupo && grupo.length) salida.push({stack:grupo, unbreakable:true});
+
   const fin = [];
-  for(let i=0; i<out.length; i++){
-    const n = out[i];
+  for(let i=0; i<salida.length; i++){
+    const n = salida[i];
     if(n.__banner){
-      const grupo = [n];
+      const juntos = [n];
       let j = i+1;
-      while(j<out.length && grupo.length<3){
-        const s = out[j];
+      while(j<salida.length && juntos.length<3){
+        const s = salida[j];
         if(s.__banner || s.__grande || s.unbreakable) break;
-        grupo.push(s); j++;
+        juntos.push(s); j++;
       }
       delete n.__banner;
-      grupo.forEach(g=>{ delete g.__banner; delete g.__grande; });
-      fin.push(grupo.length>1 ? {stack:grupo, unbreakable:true} : n);
+      juntos.forEach(g=>{ delete g.__banner; delete g.__grande; });
+      fin.push(juntos.length>1 ? {stack:juntos, unbreakable:true} : n);
       i = j-1;
     } else {
       delete n.__banner; delete n.__grande;
