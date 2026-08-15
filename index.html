@@ -1566,7 +1566,7 @@ responsiva:{
   icono:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
   version:'01', emision:'JUNIO/2026', paginas:'1 de 1',
   // Documento de entrega-recepción: firman quien entrega y quien recibe
-  firmas:{ banner:'FIRMAS DE CONFORMIDAD',
+  firmas:{ banner:'FIRMAS DE CONFORMIDAD', altoFirma:40,
            autoriza:['ENTREGA\n(Área de TI / Administración)','RECIBIDO\n(Colaborador)'],
            pies:['Nombre / Firma          Fecha:','Nombre / Firma          Fecha:'] },
   notaLegal:'COMPROMISO DEL COLABORADOR: Me comprometo a cuidar el equipo asignado por '+
@@ -1620,7 +1620,7 @@ responsiva:{
          ph:'Adaptador HDMI, base enfriadora…'},
 
         /* Un colaborador puede recibir varios equipos en la misma entrega */
-        {k:'equiposExtra', tipo:'bloques', w:12,
+        {k:'equiposExtra', tipo:'bloques', w:12, comoTabla:1,
          titulo:'Equipo Adicional', btn:'Agregar equipo',
          campos:[
            {k:'tipo',   l:'Tipo de Equipo', tipo:'sel', w:4,
@@ -2683,6 +2683,18 @@ function buildDoc(){
       if(c.tipo==='bloques'){
         flush();
         const arr = Array.isArray(S.datos[c.k]) ? S.datos[c.k] : [];
+
+        /* Como tabla: una fila por elemento en vez de un bloque de pares
+           etiqueta/valor. Misma información, una fracción del alto — para
+           un inventario de equipos además se lee mejor comparando. */
+        if(c.comoTabla && arr.length){
+          const cols = c.campos.filter(sc => !sc.noTabla);
+          B.push({t:'tablaSimple', titulo:c.titulo,
+                  heads: cols.map(sc => sc.l),
+                  filas: arr.map(rv => cols.map(sc => fmtValor(sc, (rv||{})[sc.k]))) });
+          return;
+        }
+
         arr.forEach((rv,i)=>{
           B.push({t:'sub', txt:`${c.titulo} ${i+1}`});
           let buf = [];
@@ -3102,6 +3114,14 @@ function blockHTML(b, pi, tot){
     return `<p class="${cls}">${html}</p>`;
   }
 
+  case 'tablaSimple': {
+    const th = b.heads.map(h=>`<th>${esc(h)}</th>`).join('');
+    const tr = b.filas.map((f,i)=>`<tr${i%2?' class="alt"':''}>`+
+      f.map(v=>`<td class="v">${esc(v)||'&nbsp;'}</td>`).join('')+`</tr>`).join('');
+    return `<div class="d-sbn">${esc(b.titulo)}</div>
+      <table class="d-tb"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+  }
+
   case 'tabla': {
     const th = b.heads.map(h=>`<th>${esc(h).replace(/\n/g,'<br>')}</th>`).join('');
     const tr = b.filas.map((f,i)=>`<tr${i%2?' class="alt"':''}>
@@ -3173,6 +3193,7 @@ const NOBRD = { hLineWidth:()=>0, vLineWidth:()=>0,
    densos quepan en una hoja apretando el aire, no quitando datos.
    Las funciones lo leen al dibujar, así que basta cambiarlo antes. */
 let PAD_V = 3.5;
+let PAD_OPT = 5;        // filas de casillas: respiran un poco más
 
 function lay(bw, bc){
   return { hLineWidth:()=>bw, vLineWidth:()=>bw,
@@ -3186,7 +3207,7 @@ const L_BOLD = lay(1.4, ORD);
 const L_OPT  = { hLineWidth:()=>0.6, vLineWidth:()=>0.6,
                  hLineColor:()=>'#CCCCCC', vLineColor:()=>'#CCCCCC',
                  paddingLeft:()=>5, paddingRight:()=>5,
-                 paddingTop:()=>PAD_V+1.5, paddingBottom:()=>PAD_V+1.5 };
+                 paddingTop:()=>PAD_OPT, paddingBottom:()=>PAD_OPT };
 
 /* ── Casillas dibujadas como vectores ──────────────────────────────────
    Los glifos ☑ / ☐ no existen en Roboto: el PDF los sustituye por un
@@ -3208,8 +3229,11 @@ function casilla(marcada){
 /* Devuelve una celda con las opciones repartidas en filas de máx. 4 */
 function casillasPdf(ops){
   if(!ops || !ops.length) return {text:' '};
-  // Reparto equilibrado: con 5 opciones da 3+2 en vez de 4+1
-  const nFilas = Math.ceil(ops.length / 4);
+  /* Reparto equilibrado: con 5 opciones da 3+2 en vez de 4+1.
+     En los formatos apretados caben seis por renglón, lo que ahorra una
+     fila entera en listas como la de accesorios. */
+  const POR_RENGLON = compacto() ? 6 : 4;
+  const nFilas = Math.ceil(ops.length / POR_RENGLON);
   const POR_FILA = Math.ceil(ops.length / nFilas);
   const filas = [];
   for(let i=0; i<ops.length; i+=POR_FILA) filas.push(ops.slice(i, i+POR_FILA));
@@ -3240,7 +3264,8 @@ function compacto(){ return !!(S.fmt && S.fmt.compacto); }
 const cmp = (normal, apretado) => compacto() ? apretado : normal;
 
 function pdfBlocks(){
-  PAD_V = compacto() ? 2.5 : 3.5;
+  PAD_V   = compacto() ? 2.5 : 3.5;
+  PAD_OPT = compacto() ? 2.5 : 5;
   const B = buildDoc();
   const out = [];
 
@@ -3281,7 +3306,7 @@ function pdfBlocks(){
 
     case 'sub':
       out.push({ table:{widths:['*'], body:[[{text:b.txt, style:'sbn'}]]},
-        layout:L_BOLD, margin:[0,0,0,3] });
+        layout:L_BOLD, margin:[0,0,0,cmp(3,2)] });
       break;
 
     case 'kv': {
@@ -3337,6 +3362,20 @@ function pdfBlocks(){
       out.push({ text:partes, alignment:'justify', fontSize:8,
         lineHeight:1.35, bold:!!b.b, italics:!!b.it,
         margin:[2, b.b?4:2, 2, b.b?3:4] });
+      break;
+    }
+
+    case 'tablaSimple': {
+      out.push({ table:{widths:['*'], body:[[{text:b.titulo, style:'sbn'}]]},
+        layout:L_BOLD, margin:[0,0,0,cmp(3,2)] });
+      const anchos = Array(b.heads.length).fill('*');
+      const cuerpo = [b.heads.map(h=>({text:h, style:'th'}))];
+      b.filas.forEach((f,i)=>{
+        const bg = i%2 ? LG2 : LG;
+        cuerpo.push(f.map(v=>({text:v||' ', style:'tdC', fillColor:bg})));
+      });
+      out.push({ table:{headerRows:1, widths:anchos, body:cuerpo},
+        layout:L_THIN, margin:[0,0,0,3] });
       break;
     }
 
@@ -3475,7 +3514,7 @@ function pdfDef(){
       v  :{fontSize:cmp(8.5,8), fillColor:LG},
       vn :{fontSize:cmp(8.5,8), fillColor:LG, alignment:'right'},
       ck :{fontSize:cmp(8.5,8), fillColor:LG},
-      ta :{fontSize:cmp(8.5,8), fillColor:LG, lineHeight:1.35, margin:cmp([0,2,0,8],[0,1.5,0,5])},
+      ta :{fontSize:cmp(8.5,8), fillColor:LG, lineHeight:1.35, margin:cmp([0,2,0,8],[0,1.5,0,3])},
       nota:{fontSize:cmp(6.5,6), italics:true, color:'#888888', fillColor:LG, lineHeight:cmp(1.3,1.25)},
       th :{fontSize:6.8, bold:true, color:'#FFFFFF', fillColor:OR,
            alignment:'center', margin:[0,2,0,2]},
