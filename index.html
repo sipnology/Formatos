@@ -11,9 +11,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js"></script>
 <style>
-/* Paleta tomada del Cotizador (sipnology.github.io/cotizador) para que
-   los dos aplicativos se vean del mismo sistema. Todo el portal se pinta
-   con estas variables, así que el tema vive aquí y no repartido. */
+/* Paleta institucional de Sipnology. Todo el portal se pinta con estas
+   variables, así que el tema vive aquí y no repartido por el archivo. */
 :root{
   --or:#E8632A; --or-l:#26314f; --or-d:#F0B45A; --or-soft:#1e293b;
   --ink:#e8edf7; --ink-2:#b9c3d8; --ink-3:#93a0bd;
@@ -4680,21 +4679,33 @@ async function enviarAviso(H, liga){
   const para = getAvisos(S.fmt.id);
   if(!para.length) return;
   const d = S.datos;
+  const m = d.__meta || {};
   const cuenta = cuentaActiva();
-  const asunto = `Nueva solicitud ${S.folio} · ${S.fmt.corto}`;
+  const autorizo = d.jefeNombre || m.autorizadaPor || '';
+  const asunto = `Solicitud autorizada ${S.folio} · ${S.fmt.corto}`;
+  const fila = (l, v) => v ? `<tr><td style="padding:4px 14px 4px 0;color:#666">${l}</td>
+            <td style="padding:4px 0"><b>${esc(v)}</b></td></tr>` : '';
+
+  /* Lo que Administración necesita para decidir sin abrir el archivo */
+  let detalle = '';
+  if(S.fmt.id === 'vacaciones'){
+    detalle = fila('Período', d.vacDel ? `${fDate(d.vacDel)} al ${fDate(d.vacAl)}` : '') +
+              fila('Días a disfrutar', d.diasDisfrutar ? String(d.diasDisfrutar) : '') +
+              fila('Reincorporación', d.reincorporacion ? fDate(d.reincorporacion) : '');
+  }
+
   const cuerpo = `
     <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
-      <p style="margin:0 0 14px">Se registró una solicitud que requiere ser completada
-         por el área de Administración.</p>
+      <p style="margin:0 0 14px">${autorizo ? `<b>${esc(autorizo)}</b> autorizó` : 'Se autorizó'}
+         una solicitud que requiere el visto bueno del área de Administración.</p>
       <table style="border-collapse:collapse;font-size:14px">
-        <tr><td style="padding:4px 14px 4px 0;color:#666">Tipo de solicitud</td>
-            <td style="padding:4px 0"><b>${esc(S.fmt.nombre)}</b></td></tr>
-        <tr><td style="padding:4px 14px 4px 0;color:#666">Solicitante</td>
-            <td style="padding:4px 0"><b>${esc(d.solicitante||'—')}</b></td></tr>
-        <tr><td style="padding:4px 14px 4px 0;color:#666">No. de solicitud</td>
-            <td style="padding:4px 0"><b>${esc(S.folio)}</b></td></tr>
-        <tr><td style="padding:4px 14px 4px 0;color:#666">Fecha</td>
-            <td style="padding:4px 0"><b>${esc(fDate(d.fecha || d.del || hoyISO()))}</b></td></tr>
+        ${fila('Tipo de solicitud', S.fmt.nombre)}
+        ${fila('Solicitante', d.solicitante || '—')}
+        ${fila('No. de solicitud', S.folio)}
+        ${fila('Fecha de solicitud', fDate(d.fecha || d.del || hoyISO()))}
+        ${detalle}
+        ${fila('Autorizada por', autorizo ? `${autorizo}${m.autorizadaPor ? ' · '+m.autorizadaPor : ''}` : '')}
+        ${fila('Fecha de autorización', m.autorizadaEn ? fDate(String(m.autorizadaEn).slice(0,10)) : '')}
       </table>
       ${liga.portal ? `<p style="margin:18px 0 6px"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
@@ -5122,6 +5133,44 @@ function sincronizarCabecera(){
   $('#tbSub').textContent   = `Folio ${S.folio} · Versión ${S.fmt.version}${est}${adm}`;
 }
 
+/* ── Folio vivo ────────────────────────────────────────────────────
+   Mientras la solicitud es borrador, el folio sigue al nombre. Una vez
+   enviada queda fijo: con ese nombre se archivó en SharePoint y con él
+   lo conocen el jefe y Administración.                               */
+function folioCongelado(){
+  return typeof etapa === 'function' && etapa() !== 'Borrador';
+}
+function recalcularFolio(k, iniAntes){
+  if(!S.fmt || folioCongelado()) return;
+  const anterior = S.folio;
+  delete S.datos.__consec;
+
+  if(iniAntes){
+    const iniAhora = iniciales(S.datos.solicitante);
+    const sugeridoAntes = siguienteConsecutivo(S.fmt.id, iniAntes);
+    if(iniAhora !== iniAntes &&
+       parseInt(S.datos.folioNum,10) === sugeridoAntes){
+      S.datos.folioNum = String(siguienteConsecutivo(S.fmt.id, iniAhora)).padStart(3,'0');
+      const inp = $('#f_folioNum');
+      if(inp) inp.value = S.datos.folioNum;
+    }
+  }
+
+  S.folio = calcFolio();
+  if(anterior && anterior !== S.folio) moverBorrador(anterior);
+  sincronizarCabecera();
+  renderPreview();
+}
+/* El borrador se guarda con el folio como llave; si el folio cambia,
+   se quita la llave vieja para que no quede un VAC-XXX huérfano. */
+function moverBorrador(anterior){
+  const st = store();
+  if(st.borradores && st.borradores[anterior]){
+    delete st.borradores[anterior];
+    saveStore(st);
+  }
+}
+
 /* ── Borradores ── */
 function guardarBorrador(){
   if(!S.fmt) return;
@@ -5237,15 +5286,18 @@ function renderFormConFoco(){
   }
 }
 
+/* Campos de los que sale el folio. Desde que el nombre se captura en
+   tres partes, nadie escribe directamente en 'solicitante' (es derivado),
+   así que vigilar solo ese campo dejaba el folio congelado en XXX. */
+const CLAVES_FOLIO = ['nombres','apPaterno','apMaterno','solicitante','folioNum'];
+
 function setValor(k, v){
+  /* El consecutivo sugerido depende de las iniciales: si el solicitante
+     no lo ha tocado, se vuelve a sugerir con las iniciales nuevas. */
+  const iniAntes = (k!=='folioNum' && CLAVES_FOLIO.includes(k) && S.fmt)
+    ? iniciales(S.datos.solicitante) : null;
   S.datos[k]=v;
-  // El folio depende del nombre y del consecutivo capturado
-  if(k==='solicitante' || k==='folioNum'){
-    delete S.datos.__consec;
-    S.folio = calcFolio();
-    sincronizarCabecera();
-    renderPreview();
-  }
+  if(CLAVES_FOLIO.includes(k)) recalcularFolio(k, iniAntes);
   clearTimeout(window.__sv);
   window.__sv = setTimeout(guardarBorrador, 900);
 
@@ -5432,7 +5484,14 @@ document.addEventListener('click', e=>{
     }
     const st = store();
     const b = (st.borradores||{})[dr.dataset.folio];
-    if(b){ abrirFormato(b.formato, b.datos); S.folio=b.folio; sincronizarCabecera(); }
+    if(b){
+      abrirFormato(b.formato, b.datos);
+      /* Una solicitud ya enviada conserva su folio. Un borrador se
+         recalcula: así se corrigen los que quedaron con XXX. */
+      if(folioCongelado()) S.folio = b.folio;
+      else if(b.folio !== S.folio){ moverBorrador(b.folio); guardarBorrador(); }
+      sincronizarCabecera(); renderPreview();
+    }
     return;
   }
 });
