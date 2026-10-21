@@ -1677,8 +1677,7 @@ vacaciones:{
   secciones:[
     { t:'Datos del Colaborador', d:'Quién solicita y quién autoriza',
       campos:[
-        {k:'solicitante', l:'Nombre del Colaborador', tipo:'text', w:6, req:1},
-        {k:'numEmpleado', l:'No. de Empleado',        tipo:'text', w:6},
+        {k:'solicitante', l:'Nombre del Colaborador', tipo:'text', w:12, req:1},
         {k:'area',        l:'Área y/o Departamento',  tipo:'sel',  w:6, req:1, op:DEPTOS},
         {k:'puesto',      l:'Cargo',                  tipo:'text', w:6, req:1},
 
@@ -1831,16 +1830,16 @@ Object.values(FORMATOS).forEach(f=>{
   const i = sec.campos.findIndex(c => c.k === 'solicitante');
   if(i < 0) return;
   const etiqueta = sec.campos[i].l;
+  const ancho    = sec.campos[i].w || 6;
   sec.campos.splice(i, 1,
     {k:'nombres',   l:'Nombre(s)',        tipo:'text', w:4, req:1, noDoc:1},
     {k:'apPaterno', l:'Apellido Paterno', tipo:'text', w:4, req:1, noDoc:1},
     {k:'apMaterno', l:'Apellido Materno', tipo:'text', w:4, req:1, noDoc:1,
      hint:'Ambos apellidos son obligatorios: el folio se forma con sus iniciales.'},
     // Se arma solo; aparece en el documento, no en el formulario
-    // w:6 para que en el documento se empareje con el campo siguiente,
-    // igual que cuando era un campo capturable: el papel no cambia
+    // Conserva el ancho que tenía como campo capturable: el papel no cambia
     {k:'solicitante', l:etiqueta, tipo:'derivado', calc:'nombreCompleto',
-     w:6, soloDoc:1}
+     w:ancho, soloDoc:1}
   );
 });
 
