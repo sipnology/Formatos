@@ -333,6 +333,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
 .d-lg{background:var(--or-l);border:2px solid var(--or-d);padding:8px 11px;font-size:7.5pt;
   font-style:italic;color:#333;text-align:justify;line-height:1.55;margin-bottom:11px}
 /* Bloque de firma: banner y tabla pegados, sin partirse al imprimir */
+.d-sg td.sp-n{vertical-align:bottom;text-align:center;font-weight:bold;font-size:7.5pt;color:#1E1E1E;padding:0 4px 5px}
 .d-blk{margin-bottom:11px;break-inside:avoid;page-break-inside:avoid}
 .d-blk .d-bn{margin-bottom:0;border-bottom:none}
 .d-blk .d-sg{margin-bottom:0}
@@ -1658,14 +1659,22 @@ vacaciones:{
            autoriza:['Firma de Conformidad\ndel Empleado',
                      'Autorización del Gerente\nde Área y/o Director',
                      'Vo. Bo. Administración'],
-           pies:['Nombre / Firma          Fecha:',
-                 'Nombre / Firma          Fecha:',
-                 'Nombre / Firma          Fecha:'] },
+           /* Cada firma lleva el nombre y la fecha de su etapa. Las de
+              autorización quedan en blanco hasta que esa etapa ocurre. */
+           pies:(d, m) => [
+             {nombre:d.solicitante,  fecha:(m.entregadaEn || d.fecha)},
+             {nombre:d.jefeNombre,   fecha:m.autorizadaEn},
+             /* Las cerradas antes de este cambio no guardaban el nombre de la
+                cuenta: se toma el que Administración capturó en su apartado. */
+             (m.estado === 'Completa')
+               ? {nombre:(m.completadaPorNombre || d.adm_quien || m.completadaPor),
+                  fecha :(m.completadaEn || d.adm_fechaVoBo)}
+               : {nombre:'', fecha:''},
+           ] },
   notaLegal:'Las vacaciones se otorgan conforme al Artículo 76 de la Ley Federal del Trabajo. '+
     'Los días señalados son días laborables: no cuentan los descansos semanales ni los días '+
     'de descanso obligatorio comprendidos en el período. El disfrute queda sujeto a la '+
-    'autorización del jefe directo y a las necesidades operativas del área. La prima '+
-    'vacacional se cubre conforme al Artículo 80 de la LFT.',
+    'autorización del jefe directo y a las necesidades operativas del área.',
   secciones:[
     { t:'Datos del Colaborador', d:'Quién solicita y quién autoriza',
       campos:[
@@ -1695,11 +1704,11 @@ vacaciones:{
         {k:'diasCorresponden', l:'Días que Corresponden', tipo:'derivado', w:4,
          calc:'diasLFT', de:'antiguedad',
          hint:'Art. 76 LFT: 12 días al primer año, +2 por año hasta 20, después +2 por quinquenio.'},
-        {k:'diasDisfrutar', l:'Días a Disfrutar', tipo:'entero', w:4, req:1, min:0,
+        /* Los captura el colaborador; antes eran parte del Vo. Bo. */
+        {k:'diasAutorizados', l:'Días Autorizados', tipo:'entero', w:4, req:1, min:0,
          hint:'Días laborables que tomarás en este período.'},
-        {k:'diasPendientes', l:'Días Pendientes', tipo:'derivado', w:4,
-         calc:'resta', a:'diasCorresponden', b:'diasDisfrutar',
-         hint:'Saldo que queda del ejercicio.'},
+        {k:'saldoGoce', l:'Saldo Después del Goce', tipo:'entero', w:4, req:1, min:0,
+         hint:'Días que te quedan del ejercicio después de este período.'},
         {k:'ejercicioDel', l:'Ejercicio — del Año', tipo:'entero', w:4, ph:'2025'},
         {k:'ejercicioAl',  l:'Ejercicio — al Año',  tipo:'entero', w:4, ph:'2026'},
 
@@ -1730,15 +1739,9 @@ vacaciones:{
       ]},
 
     /* ═══ Solo Administración: el Vo. Bo. que trae el formato original ═══ */
-    { t:'Vo. Bo. de Administración', d:'Confirmación del saldo y registro en nómina',
+    { t:'Vo. Bo. de Administración', d:'Observaciones de Administración',
       banner:'VISTO BUENO — ÁREA DE ADMINISTRACIÓN', soloAdmin:1,
       campos:[
-        {k:'adm_diasAut',   l:'Días Autorizados',        tipo:'entero', w:4, req:1},
-        {k:'adm_saldo',     l:'Saldo Después del Goce',  tipo:'entero', w:4, req:1},
-        {k:'adm_fechaVoBo', l:'Fecha del Vo. Bo.',       tipo:'date',   w:4, req:1},
-        {k:'adm_quien',     l:'Otorga el Vo. Bo.',       tipo:'text',   w:6, req:1},
-        {k:'adm_primaPag',  l:'¿Prima vacacional pagada?', tipo:'radio', w:6,
-         op:['Sí','No','No aplica en este período']},
         {k:'adm_obs', l:'Observaciones de Administración', tipo:'area', w:12, rows:2},
       ]},
   ]
@@ -2677,6 +2680,12 @@ function opcionesLista(c){
   return c.op.map(o=>({txt:o, on:sel.includes(o)}));
 }
 
+/* Pie de firma: nombre arriba, fecha abajo. Sin dato queda la línea
+   para llenarse a mano, como en el formato impreso. */
+function piesFirma(p){
+  const f = p.fecha ? fDate(String(p.fecha).slice(0,10)) : '';
+  return {nombre: String(p.nombre||'').trim().toUpperCase(), fecha: f};
+}
 function buildDoc(){
   /* El nombre completo, las noches y los días de vacaciones se derivan de
      otros campos. El documento puede armarse sin haber pasado por el
@@ -2792,7 +2801,9 @@ function buildDoc(){
                     (f.firmas.solicitante ? 'AUTORIZACIONES' : 'AUTORIZACIONES Y FIRMAS'),
             cols:f.firmas.autoriza,
             alto:f.firmas.altoFirma,
-            pies:f.firmas.pies || f.firmas.autoriza.map(()=> 'Nombre / Firma          Fecha:')});
+            pies: typeof f.firmas.pies === 'function'
+                    ? f.firmas.pies(S.datos, S.datos.__meta || {}).map(piesFirma)
+                    : (f.firmas.pies || f.firmas.autoriza.map(()=> 'Nombre / Firma          Fecha:'))});
   }
 
   pie();
@@ -3203,8 +3214,14 @@ function blockHTML(b, pi, tot){
       <div class="d-bn">${esc(b.banner)}</div>
       <table class="d-sg">
         ${encabezado}
-        <tr>${Array.from({length:n},()=>`<td class="sp" style="width:${w}"></td>`).join('')}</tr>
-        <tr>${b.pies.map(p=>`<td class="sl">${esc(p)}</td>`).join('')}</tr>
+        <tr>${Array.from({length:n},(_,i)=>{
+          const p = b.pies[i];
+          const nom = (p && typeof p === 'object') ? p.nombre : '';
+          return `<td class="sp${nom?' sp-n':''}" style="width:${w}">${nom?esc(nom):''}</td>`;
+        }).join('')}</tr>
+        <tr>${b.pies.map(p=> typeof p === 'string'
+          ? `<td class="sl">${esc(p)}</td>`
+          : `<td class="sl">Fecha: ${esc(p.fecha||'____________')}</td>`).join('')}</tr>
       </table></div>`;
   }
 
@@ -3488,10 +3505,19 @@ function pdfBlocks(){
       if(cols) pila.push({ table:{ widths:w, body:[
         cols.map(c=>({text:c, style:'sgh'})) ]}, layout:L_BOLD, margin:[0,0,0,0] });
       // Alto del recuadro de firma; los formatos apretados pueden bajarlo
-      pila.push({ table:{ widths:w, heights:[b.alto || 52], body:[
-        Array.from({length:n},()=>({text:' '})) ]}, layout:L_THIN, margin:[0,0,0,0] });
+      const alto = b.alto || 52;
+      pila.push({ table:{ widths:w, heights:[alto], body:[
+        Array.from({length:n},(_,i)=>{
+          const p = b.pies[i];
+          return (p && typeof p === 'object' && p.nombre)
+            ? {text:p.nombre, bold:true, fontSize:cmp(7.5,7), color:'#1E1E1E',
+               alignment:'center', margin:[2, alto-12, 2, 0]}
+            : {text:' '};
+        }) ]}, layout:L_THIN, margin:[0,0,0,0] });
       pila.push({ table:{ widths:w, body:[
-        b.pies.map(p=>({text:p, style:'sgl'})) ]}, layout:L_THIN, margin:[0,0,0,5] });
+        b.pies.map(p=> typeof p === 'string' ? {text:p, style:'sgl'}
+          : {text:'Fecha: '+(p.fecha||'____________'), style:'sgl'}) ]},
+        layout:L_THIN, margin:[0,0,0,5] });
       // unbreakable: el bloque completo salta de página junto, nunca se parte
       out.push({ stack:pila, unbreakable:true });
       break;
@@ -3657,6 +3683,7 @@ async function descargarPDF(){
         if(btn) btn.innerHTML = 'Completando…';
         const r = await guardarEnEtapa('Completa', {
           completadaPor: (cuentaActiva()||{}).username || '',
+          completadaPorNombre: (cuentaActiva()||{}).name || '',
           completadaEn : new Date().toISOString(),
         }, {yaValidado:true});
         if(r){
@@ -4690,7 +4717,7 @@ async function enviarAviso(H, liga){
   let detalle = '';
   if(S.fmt.id === 'vacaciones'){
     detalle = fila('Período', d.vacDel ? `${fDate(d.vacDel)} al ${fDate(d.vacAl)}` : '') +
-              fila('Días a disfrutar', d.diasDisfrutar ? String(d.diasDisfrutar) : '') +
+              fila('Días autorizados', d.diasAutorizados ? String(d.diasAutorizados) : '') +
               fila('Reincorporación', d.reincorporacion ? fDate(d.reincorporacion) : '');
   }
 
@@ -5081,6 +5108,24 @@ function irInicio(){
   renderHome();
 }
 
+/* ── Expedientes guardados con una versión anterior del formato ────
+   Los datos se pasan a los campos nuevos al abrirlos. No se toca el
+   estado ni los sellos de autorización: una solicitud ya autorizada
+   sigue autorizada, sin volver a pedirla.                              */
+function migrarDatos(id, d){
+  if(id === 'vacaciones'){
+    // Días Autorizados y Saldo eran del Vo. Bo.; ahora los captura el colaborador
+    if(!tieneValor(d.diasAutorizados)){
+      if(tieneValor(d.adm_diasAut))       d.diasAutorizados = d.adm_diasAut;
+      else if(tieneValor(d.diasDisfrutar)) d.diasAutorizados = d.diasDisfrutar;
+    }
+    if(!tieneValor(d.saldoGoce)){
+      if(tieneValor(d.adm_saldo))          d.saldoGoce = d.adm_saldo;
+      else if(tieneValor(d.diasPendientes)) d.saldoGoce = d.diasPendientes;
+    }
+  }
+}
+
 function abrirFormato(id, datos){
   const f = FORMATOS[id];
   if(!f) return;
@@ -5092,6 +5137,8 @@ function abrirFormato(id, datos){
     if(c.hoy && !S.datos[c.k]) S.datos[c.k]=hoyISO();
     if(c.tipo==='check' && !Array.isArray(S.datos[c.k])) S.datos[c.k]=S.datos[c.k]?[S.datos[c.k]]:[];
   }));
+
+  migrarDatos(id, S.datos);
 
   /* Expedientes guardados antes de separar el nombre: se reparte en las
      tres casillas tomando los dos últimos términos como apellidos. Es
