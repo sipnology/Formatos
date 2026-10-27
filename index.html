@@ -692,7 +692,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-    Enviar a Autorización</button>
+    <span id="btnEnviarTxt">Enviar a Autorización</span></button>
   <button class="btn btn-s" id="btnRechazar" style="display:none"
           title="Devolver la solicitud al colaborador indicando el motivo">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -827,6 +827,55 @@ const MONEDAS = ['MXN — Pesos Mexicanos','USD — Dólares Americanos'];
 const FORMAS_PAGO = ['Transferencia','Tarjeta corporativa','Depósito',
                      'Reembolso a colaborador','Crédito con proveedor'];
 
+/* ── Firmas del flujo de autorización ──────────────────────────────
+   Todos los formatos siguen el mismo camino: el empleado entrega, su
+   jefe directo autoriza y Administración da el visto bueno. Cada firma
+   lleva el nombre y la fecha de su etapa; las que no han ocurrido
+   quedan en blanco para que nadie las lea como otorgadas.            */
+const FIRMAS_FLUJO = {
+  banner:'FIRMAS Y AUTORIZACIONES', altoFirma:40,
+  autoriza:['Firma de Conformidad\ndel Empleado',
+            'Autorización del Gerente\nde Área y/o Director',
+            'Vo. Bo. Administración'],
+  pies:(d, m) => {
+    const autorizada = ['Autorizada','Completa'].includes(m.estado);
+    return [
+      {nombre:d.solicitante, fecha:(m.entregadaEn || d.fecha)},
+      autorizada ? {nombre:d.jefeNombre, fecha:m.autorizadaEn} : {nombre:d.jefeNombre, fecha:''},
+      /* Las cerradas antes de guardar el nombre de la cuenta toman el que
+         Administración había capturado en su apartado. */
+      (m.estado === 'Completa')
+        ? {nombre:(m.completadaPorNombre || d.adm_quien || d.adm_autorizo || m.completadaPor),
+           fecha :(m.completadaEn || d.adm_fechaVoBo || d.adm_fechaAut)}
+        : {nombre:'', fecha:''},
+    ];
+  },
+};
+
+/* Activos de la empresa: el colaborador envía y solo Administración
+   autoriza. El jefe directo no participa, así que no lleva su firma. */
+const FIRMAS_ADMIN = {
+  banner:'FIRMAS Y AUTORIZACIONES', altoFirma:40,
+  autoriza:['Firma de Conformidad\ndel Empleado',
+            'Autorización de\nAdministración'],
+  pies:(d, m) => [
+    {nombre:d.solicitante, fecha:(m.entregadaEn || d.fecha)},
+    (m.estado === 'Completa')
+      ? {nombre:(m.completadaPorNombre || m.completadaPor), fecha:m.completadaEn}
+      : {nombre:'', fecha:''},
+  ],
+};
+
+/* Campos de quien autoriza. A ese correo se manda la liga y contra él
+   se comprueba la identidad al momento de autorizar. */
+const CAMPOS_JEFE = () => [
+  {k:'jefeNombre',  l:'Jefe Directo',            tipo:'text', w:6, req:1,
+   hint:'Quien autoriza esta solicitud.'},
+  {k:'jefeCorreo',  l:'Correo del Jefe Directo', tipo:'mail', w:6, req:1,
+   ph:'nombre.apellido@sipnology.com.mx',
+   hint:'A este correo llega la liga para autorizar.'},
+];
+
 const FORMATOS = {
 
 /* ───────────────────────── 1. CAPACITACIÓN ───────────────────────── */
@@ -839,11 +888,9 @@ capacitacion:{
   color:'#E05C14', colorBg:'#FEF3EC',
   icono:'<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
   version:'01', emision:'JUNIO/2026', paginas:'1 de 1',
-  // El solicitante entrega el expediente completo: al generar el PDF
-  // se archiva la copia en SharePoint automáticamente.
-  subeRepo:1,
-  firmas:{ solicitante:'SOLICITANTE',
-           autoriza:['Director de Área','Dirección General','Compras'] },
+  // Jefe directo autoriza; Administración da el visto bueno
+  subeRepo:1, dosEtapas:1, adminSiempre:1,
+  firmas:FIRMAS_FLUJO,
   secciones:[
     { t:'Datos del Solicitante', d:'Información de quien realiza la solicitud',
       campos:[
@@ -851,6 +898,7 @@ capacitacion:{
         {k:'puesto',      l:'Puesto',                 tipo:'text', w:6, req:1},
         {k:'area',        l:'Área / Departamento',    tipo:'sel',  w:6, req:1, op:DEPTOS},
         {k:'correo',      l:'Correo Electrónico',     tipo:'mail', w:6, req:1, ph:'nombre@sipnology.com.mx'},
+        ...CAMPOS_JEFE(),
         {k:'ciudad',      l:'Ciudad',                 tipo:'text', w:6, req:1,
          ph:'Guadalajara, Jal.', hint:'Ciudad donde se firma la carta compromiso.'},
         {k:'fecha',       l:'Fecha de Solicitud',     tipo:'date', w:6, req:1, hoy:1},
@@ -938,11 +986,10 @@ licencia:{
   color:'#5B4BC4', colorBg:'#F0EEFB',
   icono:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/>',
   version:'01', emision:'JUNIO/2026', paginas:'2 de 2',
-  // Igual que Capacitación: el PDF y la copia en SharePoint van juntos
-  subeRepo:1,
+  // Jefe directo autoriza; Administración da el visto bueno
+  subeRepo:1, dosEtapas:1, adminSiempre:1,
   saltoPagina:'ti',
-  firmas:{ solicitante:'SOLICITANTE',
-           autoriza:['Director de Ingeniería','Director General','Compras / Finanzas'] },
+  firmas:FIRMAS_FLUJO,
   notaLegal:'NOTA LEGAL: La asignación de la licencia aprobada queda sujeta a la firma de la Carta '+
     'Compromiso de Asignación de Licencia. El uso del software deberá apegarse a los términos del '+
     'proveedor y a lo dispuesto en los Arts. 101-114 de la Ley Federal del Derecho de Autor (LFDA) '+
@@ -955,6 +1002,7 @@ licencia:{
         {k:'puesto',      l:'Puesto',                 tipo:'text', w:6, req:1},
         {k:'area',        l:'Área / Departamento',    tipo:'sel',  w:6, req:1, op:DEPTOS},
         {k:'correo',      l:'Correo Electrónico',     tipo:'mail', w:6, req:1, ph:'nombre@sipnology.com.mx'},
+        ...CAMPOS_JEFE(),
         {k:'ciudad',      l:'Ciudad',                 tipo:'text', w:6, req:1,
          ph:'Guadalajara, Jal.', hint:'Ciudad donde se firma la carta compromiso.'},
         {k:'fecha',       l:'Fecha de Solicitud',     tipo:'date', w:6, req:1, hoy:1},
@@ -1023,11 +1071,9 @@ viaticos:{
   icono:'<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
   version:'02', emision:'JULIO/2026', paginas:'1 de 1',
   // Dos etapas: el solicitante entrega y Administración completa después
-  subeRepo:1, dosEtapas:1,
-  // Mismo acomodo que Capacitación: firma del solicitante aparte y tres
-  // autorizaciones; en lugar de Compras, Tesorería.
-  firmas:{ solicitante:'SOLICITANTE',
-           autoriza:['Director de Área','Dirección General','Tesorería'] },
+  // Jefe directo autoriza; Administración siempre da el visto bueno
+  subeRepo:1, dosEtapas:1, adminSiempre:1,
+  firmas:FIRMAS_FLUJO,
   notaLegal:'COMPROMISO: Quien suscribe se hace responsable de comprobar la totalidad de los '+
     'recursos recibidos mediante comprobantes fiscales (CFDI) o recibos de gastos autorizados, '+
     'conforme a los plazos establecidos en la Política de Gastos de Viaje de SIPNOLOGY SA DE CV. '+
@@ -1565,10 +1611,15 @@ responsiva:{
   color:'#7A3FBF', colorBg:'#F2ECFB',
   icono:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
   version:'01', emision:'JUNIO/2026', paginas:'1 de 1',
-  // Documento de entrega-recepción: firman quien entrega y quien recibe
-  firmas:{ banner:'FIRMAS DE CONFORMIDAD', altoFirma:40,
-           autoriza:['ENTREGA\n(Área de TI / Administración)','RECIBIDO\n(Colaborador)'],
-           pies:['Nombre / Firma          Fecha:','Nombre / Firma          Fecha:'] },
+  /* Son activos de la empresa: el colaborador la envía directo a
+     Administración, que es la única que autoriza. Sin jefe directo. */
+  subeRepo:1, dosEtapas:1, adminSiempre:1, sinJefe:1,
+  firmas:FIRMAS_ADMIN,
+  /* Solo estas cuentas pueden abrir la Carta Responsiva en el portal. */
+  acceso:['fernando.fernandez@sipnology.com.mx',
+          'sahira.bermudez@sipnology.com.mx',
+          'miriam.gutierrez@sipnology.com.mx',
+          'leonardo.montes@sipnology.com.mx'],
   notaLegal:'COMPROMISO DEL COLABORADOR: Me comprometo a cuidar el equipo asignado por '+
     'SIPNOLOGY SA DE CV para uso exclusivo de mis actividades laborales, manteniéndolo en buen '+
     'estado y dando aviso inmediato ante cualquier daño, pérdida o robo. Estoy consciente de la '+
@@ -1581,8 +1632,7 @@ responsiva:{
   secciones:[
     { t:'Datos del Colaborador', d:'A quién se le asigna el equipo',
       campos:[
-        {k:'solicitante', l:'Nombre del Colaborador', tipo:'text', w:6, req:1},
-        {k:'noEmpleado',  l:'No. de Empleado',        tipo:'text', w:6, req:1, ph:'SIP-021'},
+        {k:'solicitante', l:'Nombre del Colaborador', tipo:'text', w:12, req:1},
         {k:'area',        l:'Departamento / Área',    tipo:'sel',  w:6, req:1, op:DEPTOS},
         {k:'puesto',      l:'Puesto',                 tipo:'text', w:6, req:1},
         {k:'ciudad',      l:'Ciudad',                 tipo:'text', w:6, req:1,
@@ -1655,22 +1705,7 @@ vacaciones:{
      apiladas —una para el empleado y otra para las autorizaciones— gastaba
      228 pt, un tercio de la hoja, y empujaba el documento a una segunda
      página en cuanto Administración agregaba su apartado. */
-  firmas:{ banner:'FIRMAS Y AUTORIZACIONES', altoFirma:40,
-           autoriza:['Firma de Conformidad\ndel Empleado',
-                     'Autorización del Gerente\nde Área y/o Director',
-                     'Vo. Bo. Administración'],
-           /* Cada firma lleva el nombre y la fecha de su etapa. Las de
-              autorización quedan en blanco hasta que esa etapa ocurre. */
-           pies:(d, m) => [
-             {nombre:d.solicitante,  fecha:(m.entregadaEn || d.fecha)},
-             {nombre:d.jefeNombre,   fecha:m.autorizadaEn},
-             /* Las cerradas antes de este cambio no guardaban el nombre de la
-                cuenta: se toma el que Administración capturó en su apartado. */
-             (m.estado === 'Completa')
-               ? {nombre:(m.completadaPorNombre || d.adm_quien || m.completadaPor),
-                  fecha :(m.completadaEn || d.adm_fechaVoBo)}
-               : {nombre:'', fecha:''},
-           ] },
+  firmas:FIRMAS_FLUJO,
   notaLegal:'Los días señalados son días laborables: no cuentan los descansos semanales ni '+
     'los días de descanso obligatorio comprendidos en el período. El disfrute queda sujeto '+
     'a la autorización del jefe directo y a las necesidades operativas del área.',
@@ -2537,9 +2572,13 @@ function actualizarProgreso(){
     nota = S.modoAdmin
       ? ` · <span style="color:var(--ok)">modo Administración · al completar se cierra y el PDF va al solicitante</span>`
       : ({
-        'Borrador'     : ` · <span style="color:var(--or-d)">al enviarla, ${esc(S.datos.jefeNombre||'tu jefe directo')} recibe la liga para autorizarla</span>`,
+        'Borrador'     : S.fmt.sinJefe
+          ? ` · <span style="color:var(--or-d)">al enviarla, Administración recibe la liga para autorizarla</span>`
+          : ` · <span style="color:var(--or-d)">al enviarla, ${esc(S.datos.jefeNombre||'tu jefe directo')} recibe la liga para autorizarla</span>`,
         'Por autorizar': ` · <span style="color:var(--or-d)">esperando autorización de ${esc(S.datos.jefeNombre||S.datos.jefeCorreo||'el jefe directo')}</span>`,
-        'Autorizada'   : ` · <span style="color:var(--ok)">autorizada · Administración la está completando</span>`,
+        'Autorizada'   : S.fmt.sinJefe
+          ? ` · <span style="color:var(--or-d)">enviada · esperando la autorización de Administración</span>`
+          : ` · <span style="color:var(--ok)">autorizada · Administración la está completando</span>`,
         'Completa'     : ` · <span style="color:var(--ok)">completa · el PDF ya está disponible</span>`,
         'Rechazada'    : ` · <span style="color:var(--warn)">devuelta: ${esc((S.datos.__meta||{}).motivoRechazo||'sin motivo')}</span>`,
       }[e] || '');
@@ -2568,7 +2607,12 @@ function sincronizarBotones(){
   ver('#btnEnviar',    dos && !admin && (e==='Borrador' || e==='Rechazada'));
   /* Solo el jefe capturado en el apartado 1, y solo mientras esté pendiente */
   ver('#btnAutorizar', dos && e==='Por autorizar' && jefe);
-  ver('#btnRechazar',  dos && e==='Por autorizar' && jefe);
+  /* Sin jefe directo, Administración es quien autoriza o devuelve */
+  const sinJefe = !!S.fmt.sinJefe;
+  ver('#btnRechazar',  dos && ((e==='Por autorizar' && jefe) ||
+                               (sinJefe && admin && e==='Autorizada')));
+  const tEnv = $('#btnEnviarTxt');
+  if(tEnv) tEnv.textContent = sinJefe ? 'Enviar a Administración' : 'Enviar a Autorización';
   /* Administración entra a capturar una vez que está autorizada */
   ver('#btnAdmin',     dos && !admin && e==='Autorizada');
 
@@ -2581,7 +2625,7 @@ function sincronizarBotones(){
   bPDF.classList.toggle('btn-p', puede);
   bPDF.classList.toggle('btn-s', !puede);
   bPDF.title = puede ? '' : {
-    'Borrador'     :'Primero envíala a autorización',
+    'Borrador'     : S.fmt.sinJefe ? 'Primero envíala a Administración' : 'Primero envíala a autorización',
     'Por autorizar':'Esperando la autorización del jefe directo',
     'Autorizada'   :'Esperando que Administración la complete',
     'Rechazada'    :'Fue devuelta: corrígela y vuelve a enviarla',
@@ -2915,8 +2959,9 @@ capacitacion(){
                           '     Fecha: ', V(fDate(d.fecha||hoyISO()),18)]});
 
   B.push({t:'firmas', banner:'FIRMAS',
-          cols:['SOLICITANTE','DIRECCIÓN DE ÁREA'],
-          pies:['Nombre y Firma','Nombre y Firma']});
+          cols:['SOLICITANTE','DIRECCIÓN DE ÁREA','VO. BO. ADMINISTRACIÓN'],
+          alto:40,
+          pies:firmasCarta(d)});
   B.push({t:'footer', version:f.version, emision:f.emision});
   return B;
 },
@@ -3032,13 +3077,20 @@ licencia(){
                           '     Fecha: ', V(fDate(d.fecha||hoyISO()),18)]});
 
   B.push({t:'firmas', banner:'FIRMAS',
-          cols:['SOLICITANTE','DIRECCIÓN DE ÁREA'],
-          pies:['Nombre y Firma','Nombre y Firma']});
+          cols:['SOLICITANTE','DIRECCIÓN DE ÁREA','VO. BO. ADMINISTRACIÓN'],
+          alto:40,
+          pies:firmasCarta(d)});
   B.push({t:'footer', version:f.version, emision:f.emision});
   return B;
 },
 
 };
+
+/* La carta compromiso lleva las mismas tres firmas que el formato al
+   que acompaña, con los mismos nombres y fechas. */
+function firmasCarta(d){
+  return FIRMAS_FLUJO.pies(d, d.__meta || {}).map(piesFirma);
+}
 
 function bloqueLista(c){
   const n = Math.max(0, Math.min(30, parseInt(S.datos[c.n])||0));
@@ -3775,7 +3827,8 @@ function importarJSON(file){
       }
       // Sin esto se pierde quién entregó, y el PDF final no sabría a
       // quién regresar cuando Administración cierre la solicitud.
-      S.datos.__meta = j._meta;
+      S.datos.__meta = metaLegado(id, j._meta);
+      if(!puedeAcceder(FORMATOS[id])){ irInicio(); toast(avisoAcceso(FORMATOS[id]),'err',7000); return; }
       sincronizarCabecera();
       renderForm();
       toast('Solicitud importada · '+S.folio,'ok');
@@ -4119,6 +4172,9 @@ const CARPETAS = {
   viaticos     : 'Viaticos',
   vuelo        : 'Vuelo y Hospedaje',
   vacaciones   : 'Vacaciones',
+  /* Ahora pasa por autorización: el jefe la abre desde su liga, así que
+     necesita carpeta propia en SharePoint. */
+  responsiva   : 'Carta Responsiva',
 };
 
 let _msalApp = null;
@@ -4453,7 +4509,11 @@ async function cargarSolicitud(drive, H, itemId){
   const ov = $('#ovRepo'); if(ov) ov.classList.remove('on');
   abrirFormato(id, j.datos || {});
   if(j._meta.folio){ S.folio = j._meta.folio; }
-  S.datos.__meta = j._meta;            // conserva quién entregó y cuándo
+  S.datos.__meta = metaLegado(id, j._meta);   // conserva quién entregó y cuándo
+  if(!puedeAcceder(FORMATOS[id])){
+    irInicio();
+    throw new Error(avisoAcceso(FORMATOS[id]));
+  }
   // Quien llega hasta aquí ya inició sesión: si está autorizado,
   // entra directo en modo Administración sin volver a pedir credenciales.
   if(FORMATOS[id].dosEtapas && typeof esAdmin==='function' && esAdmin()) S.modoAdmin = true;
@@ -4558,6 +4618,52 @@ function repoConfigRestaurar(){
   toast('Se restauró la configuración predeterminada.','ok');
 }
 
+
+/* Capacitación y Licencia se archivaban al descargar el PDF, sin etapas.
+   Esos expedientes ya están cerrados: se tratan como completos para que
+   su PDF se siga pudiendo descargar. */
+function metaLegado(id, m){
+  m = m || {};
+  if(FORMATOS[id] && FORMATOS[id].dosEtapas && !m.estado) m.estado = 'Completa';
+  return m;
+}
+
+/* ── Formatos de acceso restringido ────────────────────────────────
+   Se comprueba con la cuenta Microsoft. Es una puerta del portal, no
+   del archivo: lo que de verdad protege los expedientes es el permiso
+   de la carpeta en SharePoint.                                       */
+function correoCuenta(){
+  const c = cuentaActiva();
+  return String((c && c.username) || '').trim().toLowerCase();
+}
+function puedeAcceder(f){
+  if(!f || !f.acceso) return true;
+  const yo = correoCuenta();
+  if(!yo) return false;
+  if(f.acceso.some(a => a.toLowerCase() === yo)) return true;
+  // En los formatos con jefe, el jefe de esa solicitud puede abrirla para autorizarla
+  return !f.sinJefe && String((S.datos||{}).jefeCorreo||'').trim().toLowerCase() === yo;
+}
+function avisoAcceso(f){
+  const yo = correoCuenta();
+  return `${f.nombre} solo la pueden levantar personas autorizadas.` +
+         (yo ? ` Entraste como ${yo}.` : ' Inicia sesión con tu cuenta Sipnology.');
+}
+async function abrirRestringido(id){
+  const f = FORMATOS[id];
+  try{
+    if(!correoCuenta()) await graphToken(getGraphCfg());   // pide iniciar sesión
+  }catch(e){
+    toast('Para abrir '+f.nombre+' inicia sesión con tu cuenta Sipnology.','err',6000);
+    return;
+  }
+  const yo = correoCuenta();
+  if(!f.acceso.some(a => a.toLowerCase() === yo)){
+    toast(avisoAcceso(f),'err',7000); return;
+  }
+  abrirFormato(id);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    FLUJO DE DOS ETAPAS
    El solicitante entrega la solicitud y queda en Pendientes.
@@ -4573,14 +4679,17 @@ const ADMINS_DEFAULT = [
   'fernando.fernandez@sipnology.com.mx',
 ];
 
-/* A quién se avisa cuando una solicitud llega a Administración.
-   Va al mismo grupo: quien la completa es quien debe enterarse. */
+/* A quién se avisa cuando el jefe autoriza: las responsables de
+   Administración. El jefe directo recibe copia del mismo correo como
+   constancia de que su autorización quedó registrada. Fernando sigue
+   pudiendo completar solicitudes durante la prueba, pero ya no recibe
+   el aviso. */
 const AVISOS_KEY = 'sip_avisos_formatos';
-const AVISOS_DEFAULT = {
-  viaticos   : ADMINS_DEFAULT.slice(),
-  vuelo      : ADMINS_DEFAULT.slice(),
-  vacaciones : ADMINS_DEFAULT.slice(),
-};
+const RESPONSABLES_ADMIN = [
+  'miriam.gutierrez@sipnology.com.mx',
+  'sahira.bermudez@sipnology.com.mx',
+];
+const AVISOS_DEFAULT = {};
 
 /* ── Etapas del expediente ─────────────────────────────────────────
    Borrador → Por autorizar → Autorizada → Completa
@@ -4633,8 +4742,8 @@ function getAdmins(){
 function getAvisos(fmtId){
   try{ const s = JSON.parse(localStorage.getItem(AVISOS_KEY)||'null');
        const m = (s && typeof s==='object') ? s : AVISOS_DEFAULT;
-       return m[fmtId] || AVISOS_DEFAULT[fmtId] || []; }
-  catch(e){ return AVISOS_DEFAULT[fmtId] || []; }
+       return m[fmtId] || AVISOS_DEFAULT[fmtId] || RESPONSABLES_ADMIN; }
+  catch(e){ return AVISOS_DEFAULT[fmtId] || RESPONSABLES_ADMIN; }
 }
 
 /* ¿La cuenta con la que se entró puede completar solicitudes? */
@@ -4699,6 +4808,13 @@ function ligas(drive, subido){
 /* ── Aviso por correo ──────────────────────────────────────────────
    Sale a nombre de quien entrega la solicitud, con los datos que
    Administración necesita para ubicarla sin abrir el archivo.      */
+/* Copia al jefe directo, salvo que ya venga entre los destinatarios */
+function copiaJefe(para){
+  const j = String((S.datos||{}).jefeCorreo||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(j)) return [];
+  return para.some(a => a.toLowerCase() === j.toLowerCase()) ? [] : [j];
+}
+
 async function enviarAviso(H, liga){
   liga = liga || {};
   const para = getAvisos(S.fmt.id);
@@ -4706,23 +4822,21 @@ async function enviarAviso(H, liga){
   const d = S.datos;
   const m = d.__meta || {};
   const cuenta = cuentaActiva();
-  const autorizo = d.jefeNombre || m.autorizadaPor || '';
-  const asunto = `Solicitud autorizada ${S.folio} · ${S.fmt.corto}`;
+  const autorizo = S.fmt.sinJefe ? '' : (d.jefeNombre || m.autorizadaPor || '');
+  const asunto = S.fmt.sinJefe
+    ? `Autorización requerida · ${S.folio} · ${S.fmt.corto}`
+    : `Solicitud autorizada ${S.folio} · ${S.fmt.corto}`;
   const fila = (l, v) => v ? `<tr><td style="padding:4px 14px 4px 0;color:#666">${l}</td>
             <td style="padding:4px 0"><b>${esc(v)}</b></td></tr>` : '';
 
   /* Lo que Administración necesita para decidir sin abrir el archivo */
-  let detalle = '';
-  if(S.fmt.id === 'vacaciones'){
-    detalle = fila('Período', d.vacDel ? `${fDate(d.vacDel)} al ${fDate(d.vacAl)}` : '') +
-              fila('Días autorizados', d.diasAutorizados ? String(d.diasAutorizados) : '') +
-              fila('Reincorporación', d.reincorporacion ? fDate(d.reincorporacion) : '');
-  }
+  const detalle = resumenCorreo().filas.map(r => fila(r[0], r[1] ? String(r[1]) : '')).join('');
 
   const cuerpo = `
     <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
-      <p style="margin:0 0 14px">${autorizo ? `<b>${esc(autorizo)}</b> autorizó` : 'Se autorizó'}
-         una solicitud que requiere el visto bueno del área de Administración.</p>
+      <p style="margin:0 0 14px">${S.fmt.sinJefe
+         ? `<b>${esc(d.solicitante||'Un colaborador')}</b> envió una solicitud que requiere la autorización del área de Administración.`
+         : `${autorizo ? `<b>${esc(autorizo)}</b> autorizó` : 'Se autorizó'} una solicitud que requiere el visto bueno del área de Administración.`}</p>
       <table style="border-collapse:collapse;font-size:14px">
         ${fila('Tipo de solicitud', S.fmt.nombre)}
         ${fila('Solicitante', d.solicitante || '—')}
@@ -4750,6 +4864,7 @@ async function enviarAviso(H, liga){
         subject:asunto,
         body:{contentType:'HTML', content:cuerpo},
         toRecipients: para.map(a=>({emailAddress:{address:a}})),
+        ccRecipients: copiaJefe(para).map(a=>({emailAddress:{address:a}})),
       },
       saveToSentItems:true,
     }),
@@ -4898,6 +5013,25 @@ async function enviarAutorizacion(){
   if(!S.fmt || !S.fmt.dosEtapas) return;
   if(!validar()) return;
 
+  /* Sin jefe directo: pasa directo a Administración, que es quien autoriza */
+  if(S.fmt.sinJefe){
+    await conRepositorio(async ()=>{
+      const r = await guardarEnEtapa('Autorizada', {
+        entregadaPor: (cuentaActiva()||{}).username || '',
+        entregadaEn : new Date().toISOString(),
+      }, {yaValidado:true});
+      if(!r) return;
+      try{
+        await enviarAviso(r.H, ligas(r.drive, r.subido));
+        toast(`Solicitud ${S.folio} enviada a Administración para su autorización.`,'ok',7000);
+      }catch(err){
+        console.error(err);
+        toast('La solicitud quedó guardada, pero no salió el aviso a Administración.','inf',7500);
+      }
+    }, $('#btnEnviar'), 'Enviando…');
+    return;
+  }
+
   const jefe = String(S.datos.jefeCorreo||'').trim();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(jefe)){
     toast('Revisa el correo del jefe directo: a esa cuenta se manda la '+
@@ -4969,7 +5103,14 @@ async function autorizarSolicitud(){
 }
 
 function rechazarSolicitud(){
-  if(!esJefe()){
+  // En la Carta Responsiva quien autoriza —y por tanto quien devuelve— es Administración
+  const puede = S.fmt.sinJefe ? esAdmin() : esJefe();
+  if(!puede && S.fmt.sinJefe){
+    const c = cuentaActiva();
+    toast(`Esta solicitud solo la puede devolver Administración. Entraste como ${c?c.username:'—'}.`,'err',7000);
+    return;
+  }
+  if(!puede){
     const c = cuentaActiva();
     toast(`Esta solicitud solo la puede rechazar ${S.datos.jefeCorreo||'el jefe directo'}. `+
           `Entraste como ${c?c.username:'—'}.`,'err',7000);
@@ -5006,15 +5147,14 @@ async function correoAutorizacion(H, liga){
   const cuerpo = `
     <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
       <p style="margin:0 0 14px">${esc(d.solicitante||'Un colaborador')} solicita tu
-         autorización para el siguiente viaje.</p>
+         autorización ${esc(resumenCorreo().frase)}.</p>
       <table style="border-collapse:collapse;font-size:14px">
+        ${fila('Tipo de solicitud', S.fmt.nombre)}
         ${fila('ID de solicitud', S.folio)}
         ${fila('Solicitante', d.solicitante)}
         ${fila('Departamento', d.area)}
         ${fila('Cargo', d.puesto)}
-        ${fila('Cliente', d.cliente)}
-        ${fila('Fechas', periodo)}
-        ${fila('Propósito del viaje', d.motivo)}
+        ${resumenCorreo().filas.filter(r=>r[1]).map(r=>fila(r[0], String(r[1]))).join('')}
       </table>
       ${liga.portal ? `<p style="margin:20px 0 6px"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:11px 20px;
@@ -5047,7 +5187,8 @@ async function correoRechazo(H, liga, motivo){
   const cuerpo = `
     <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
       <p style="margin:0 0 14px">Tu solicitud <b>${esc(S.folio)}</b> fue devuelta por
-         ${esc(S.datos.jefeNombre || 'tu jefe directo')}.</p>
+         ${S.fmt.sinJefe ? 'el área de Administración'
+                         : esc(S.datos.jefeNombre || 'tu jefe directo')}.</p>
       <p style="margin:0 0 14px;padding:12px 14px;background:#FDF0EC;
          border-left:3px solid #C0392B"><b>Motivo:</b> ${esc(motivo)}</p>
       ${liga.portal ? `<p style="margin:18px 0 0"><a href="${esc(liga.portal)}"
@@ -5091,6 +5232,31 @@ async function activarModoAdmin(){
     if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
   }catch(e){
     toast('No se pudo iniciar sesión: '+e.message,'err',5500);
+  }
+}
+
+
+/* ── Lo esencial de cada formato, para los correos ─────────────────
+   El jefe y Administración deciden con esto sin abrir el archivo.   */
+function resumenCorreo(){
+  const d = S.datos, id = S.fmt.id;
+  const lista = v => Array.isArray(v) ? v.filter(Boolean).join(', ') : (v||'');
+  const rango = (a,b) => [fDate(a), fDate(b)].filter(Boolean).join(' al ');
+  switch(id){
+    case 'viaticos': return { frase:'para el siguiente viaje', filas:[
+      ['Cliente', d.cliente], ['Fechas', rango(d.del, d.al)], ['Propósito del viaje', d.motivo]]};
+    case 'vacaciones': return { frase:'para el siguiente período de vacaciones', filas:[
+      ['Período', rango(d.vacDel, d.vacAl)], ['Días autorizados', d.diasAutorizados],
+      ['Reincorporación', fDate(d.reincorporacion)]]};
+    case 'capacitacion': return { frase:'para la siguiente capacitación', filas:[
+      ['Formación', lista(d.formacion)], ['Curso', d.cursoNombre], ['Examen', d.examenNombre],
+      ['Material', d.matTitulo]]};
+    case 'licencia': return { frase:'para la siguiente licencia', filas:[
+      ['Aplicativo', d.app], ['Fabricante', d.fabricante], ['N.° de licencias', d.numLic]]};
+    case 'responsiva': return { frase:'para la siguiente asignación de equipo', filas:[
+      ['Equipo', lista(d.tipoEquipo)], ['Tipo de asignación', d.tipoAsignacion],
+      ['Fecha de asignación', fDate(d.fecha)]]};
+    default: return { frase:'', filas:[] };
   }
 }
 
@@ -5518,6 +5684,8 @@ document.addEventListener('click', e=>{
   const card = e.target.closest('.card');
   if(card){
     if(card.dataset.tool === 'firma') abrirFirma();
+    else if(FORMATOS[card.dataset.fmt] && FORMATOS[card.dataset.fmt].acceso)
+      abrirRestringido(card.dataset.fmt);
     else abrirFormato(card.dataset.fmt);
     return;
   }
@@ -5566,7 +5734,8 @@ function renderHome(){
       <div class="card-top">
         <div class="card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${f.icono}</svg></div>
-        <div class="card-h"><h3>${esc(f.nombre)}</h3></div>
+        <div class="card-h"><h3>${esc(f.nombre)}</h3>${f.acceso
+          ? '<span class="card-tag">Acceso restringido</span>' : ''}</div>
       </div>
       <p>${esc(f.desc)}</p>
       <div class="card-foot"><span></span>
