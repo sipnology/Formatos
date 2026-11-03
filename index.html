@@ -693,8 +693,14 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
     <span id="btnEnviarTxt">Enviar a Autorización</span></button>
+  <button class="btn btn-s" id="btnDevolver" style="display:none"
+          title="Regresarla al solicitante para que haga ajustes y la vuelva a enviar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg>
+    Devolver al solicitante</button>
   <button class="btn btn-s" id="btnRechazar" style="display:none"
-          title="Devolver la solicitud al colaborador indicando el motivo">
+          title="Rechazar la solicitud de forma definitiva indicando el motivo">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -791,6 +797,21 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
     <div class="modal-a">
       <button class="btn btn-s" id="ovCancel">Cancelar</button>
       <button class="btn btn-p" id="ovOk">Sí, limpiar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MOTIVO DE DEVOLUCIÓN O RECHAZO ══════════════ -->
+<div class="ov" id="ovMotivo">
+  <div class="modal">
+    <h3 id="motTit">Devolver al solicitante</h3>
+    <p id="motTxt"></p>
+    <textarea id="motCampo" rows="4" style="width:100%;margin:4px 0 14px;padding:10px 12px;
+      border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+      font:inherit;resize:vertical" placeholder="Escribe el motivo…"></textarea>
+    <div class="modal-a">
+      <button class="btn btn-s" id="motCancelar">Cancelar</button>
+      <button class="btn btn-p" id="motOk">Devolver</button>
     </div>
   </div>
 </div>
@@ -1272,9 +1293,18 @@ viaticos:{
         {k:'hospConf',  l:'No. de confirmación',  tipo:'text', w:6, soloAdmin:1, req:1,
          cond:{k:'hospedaje', igual:'Sí'},
          hint:'Sin este dato no se puede cerrar la solicitud.'},
-        {k:'hospCosto', l:'Costo del hospedaje',  tipo:'dinero', w:6, soloAdmin:1,
-         cond:{k:'hospedaje', igual:'Sí'},
-         hint:'Lo captura Administración; suma al total de la solicitud.'},
+        /* Administración decide cómo se cubre el hotel. Pagado: Sipnology
+           lo liquida y no pasa por el colaborador. Reservado: el colaborador
+           paga en sitio, así que el monto se le deposita junto al anticipo. */
+        {k:'hospPago',  l:'¿El hotel queda pagado o reservado?', tipo:'radio', w:12,
+         soloAdmin:1, req:1, op:['Pagado por Sipnology','Reservado · lo paga el colaborador en sitio'],
+         cond:{k:'hospedaje', igual:'Sí'}},
+        {k:'hospCosto', l:'Costo del hospedaje (lo paga Sipnology)', tipo:'dinero', w:6, soloAdmin:1,
+         req:1, todas:[{k:'hospedaje', igual:'Sí'}, {k:'hospPago', igual:'Pagado por Sipnology'}]},
+        {k:'hospDeposito', l:'Monto a depositar al colaborador', tipo:'dinero', w:6, soloAdmin:1,
+         req:1, todas:[{k:'hospedaje', igual:'Sí'},
+                       {k:'hospPago', igual:'Reservado · lo paga el colaborador en sitio'}],
+         hint:'Se suma al total que se le deposita.'},
         {k:'obsHosp',   l:'Observaciones',        tipo:'text',  w:12, ph:'Incluye desayuno',
          cond:{k:'hospedaje', igual:'Sí'}},
 
@@ -1290,7 +1320,10 @@ viaticos:{
            {k:'noches',  l:'N.° de Noches',       tipo:'noches',w:4,
             desde:'del', hasta:'al'},
            {k:'conf',    l:'No. de confirmación',  tipo:'text', w:6, soloAdmin:1, req:1},
-           {k:'costo',   l:'Costo del hospedaje', tipo:'dinero', w:6, soloAdmin:1},
+           {k:'pago',    l:'¿El hotel queda pagado o reservado?', tipo:'radio', w:12,
+            soloAdmin:1, op:['Pagado por Sipnology','Reservado · lo paga el colaborador en sitio']},
+           {k:'costo',   l:'Costo del hospedaje (lo paga Sipnology)', tipo:'dinero', w:6, soloAdmin:1},
+           {k:'deposito',l:'Monto a depositar al colaborador', tipo:'dinero', w:6, soloAdmin:1},
            {k:'obs',     l:'Observaciones',       tipo:'text',  w:12, ph:'Incluye desayuno'},
          ]},
       ]},
@@ -1361,15 +1394,20 @@ viaticos:{
          }},
          hint:'Vuelos y autobuses. Lo paga Administración directamente.'},
 
-        {k:'subHospedaje', l:'Subtotal · Hospedaje', tipo:'calc', w:6,
-         formula:{sumaConBloques:{
-           campos:['hospCosto'],
-           bloques:[{k:'hospedajesExtra', campo:'costo'}],
-         }},
-         hint:'Lo paga Administración directamente.'},
+        {k:'subHospedaje', l:'Subtotal · Hospedaje pagado por Sipnology', tipo:'calc', w:6,
+         formula:{hospedaje:'pagado'},
+         hint:'Hoteles que Administración liquida directamente.'},
+
+        {k:'subHospDeposito', l:'Subtotal · Hospedaje a pagar en sitio', tipo:'calc', w:6,
+         formula:{hospedaje:'reservado'},
+         hint:'Hoteles reservados: el colaborador los paga y se le deposita el monto.'},
+
+        {k:'totalDeposito', l:'TOTAL A DEPOSITAR AL COLABORADOR', tipo:'calc', w:6,
+         formula:{sumaCalc:['subAnticipo','subHospDeposito']},
+         hint:'Anticipo más los hoteles que pagará en sitio.'},
 
         {k:'totalSolicitud', l:'TOTAL DE LA SOLICITUD', tipo:'calc', w:6,
-         formula:{sumaCalc:['subAnticipo','subTransporte','subHospedaje']},
+         formula:{sumaCalc:['subAnticipo','subTransporte','subHospedaje','subHospDeposito']},
          hint:'Costo completo del viaje para la empresa.'},
 
         {k:'deposito', l:'Forma de Depósito', tipo:'radio', w:12, req:1,
@@ -2198,6 +2236,26 @@ function valorCalculado(c){
     return tot;
   }
 
+  /* Hospedaje según cómo se cubre: 'pagado' suma lo que liquida Sipnology,
+     'reservado' lo que se deposita al colaborador. Un hotel sin modalidad
+     todavía no cuenta en ninguno de los dos. */
+  if(f.hospedaje){
+    const d = S.datos;
+    if(d.hospedaje !== 'Sí') return 0;
+    const pagado = f.hospedaje === 'pagado';
+    const cuenta = (modo, costo, dep) => {
+      if(!modo) return 0;
+      const esPag = /^Pagado/.test(modo);
+      if(pagado !== esPag) return 0;
+      return parseFloat(limpiaNum(esPag ? costo : dep)) || 0;
+    };
+    let tot = cuenta(d.hospPago, d.hospCosto, d.hospDeposito);
+    (Array.isArray(d.hospedajesExtra) ? d.hospedajesExtra : []).forEach(rv=>{
+      if(rv) tot += cuenta(rv.pago, rv.costo, rv.deposito);
+    });
+    return tot;
+  }
+
   /* Suma de otros campos calculados: permite un total de totales sin
      repetir sus fórmulas. */
   if(f.sumaCalc){
@@ -2221,6 +2279,8 @@ function clavesDeFormula(){
       (f.sumaConBloques.campos || []).forEach(k=>set.add(k));
       (f.sumaConBloques.bloques || []).forEach(b=>set.add(b.k));
     }
+    if(f.hospedaje)
+      ['hospedaje','hospPago','hospCosto','hospDeposito','hospedajesExtra'].forEach(k=>set.add(k));
   }));
   return set;
 }
@@ -2580,7 +2640,10 @@ function actualizarProgreso(){
           ? ` · <span style="color:var(--or-d)">enviada · esperando la autorización de Administración</span>`
           : ` · <span style="color:var(--ok)">autorizada · Administración la está completando</span>`,
         'Completa'     : ` · <span style="color:var(--ok)">completa · el PDF ya está disponible</span>`,
-        'Rechazada'    : ` · <span style="color:var(--warn)">devuelta: ${esc((S.datos.__meta||{}).motivoRechazo||'sin motivo')}</span>`,
+        'Devuelta'     : ` · <span style="color:var(--warn)">devuelta para ajustes: ${esc((S.datos.__meta||{}).motivoRechazo||'sin motivo')} · corrígela y vuelve a enviarla</span>`,
+        'Rechazada'    : (S.datos.__meta||{}).rechazoFinal
+          ? ` · <span style="color:var(--err)">rechazada: ${esc((S.datos.__meta||{}).motivoRechazo||'sin motivo')} · no puede reenviarse</span>`
+          : ` · <span style="color:var(--warn)">devuelta: ${esc((S.datos.__meta||{}).motivoRechazo||'sin motivo')}</span>`,
       }[e] || '');
   }else if(S.fmt.subeRepo){
     nota = ` · <span style="color:var(--or-d)">al descargar el PDF se archiva en SharePoint</span>`;
@@ -2604,13 +2667,15 @@ function sincronizarBotones(){
   const ver = (sel, on) => { const b = $(sel); if(b) b.style.display = on ? '' : 'none'; };
 
   /* El solicitante entrega, o vuelve a entregar si le devolvieron la solicitud */
-  ver('#btnEnviar',    dos && !admin && (e==='Borrador' || e==='Rechazada'));
+  ver('#btnEnviar',    dos && !admin && reenviable());
   /* Solo el jefe capturado en el apartado 1, y solo mientras esté pendiente */
   ver('#btnAutorizar', dos && e==='Por autorizar' && jefe);
   /* Sin jefe directo, Administración es quien autoriza o devuelve */
   const sinJefe = !!S.fmt.sinJefe;
-  ver('#btnRechazar',  dos && ((e==='Por autorizar' && jefe) ||
-                               (sinJefe && admin && e==='Autorizada')));
+  const decide = dos && ((e==='Por autorizar' && jefe) ||
+                         (sinJefe && admin && e==='Autorizada'));
+  ver('#btnRechazar',  decide);
+  ver('#btnDevolver',  decide);
   const tEnv = $('#btnEnviarTxt');
   if(tEnv) tEnv.textContent = sinJefe ? 'Enviar a Administración' : 'Enviar a Autorización';
   /* Administración entra a capturar una vez que está autorizada */
@@ -2628,7 +2693,8 @@ function sincronizarBotones(){
     'Borrador'     : S.fmt.sinJefe ? 'Primero envíala a Administración' : 'Primero envíala a autorización',
     'Por autorizar':'Esperando la autorización del jefe directo',
     'Autorizada'   :'Esperando que Administración la complete',
-    'Rechazada'    :'Fue devuelta: corrígela y vuelve a enviarla',
+    'Devuelta'     :'Fue devuelta: corrígela y vuelve a enviarla',
+    'Rechazada'    :'Fue rechazada',
   }[e] || 'Aún no está disponible';
   if(txt) txt.textContent = (dos && admin && e!=='Completa')
     ? 'Completar y descargar PDF' : 'Descargar PDF';
@@ -3701,7 +3767,8 @@ async function descargarPDF(){
       'Borrador'     :'Usa "Enviar a Autorización" para entregarla.',
       'Por autorizar':'Está esperando la autorización de '+(S.datos.jefeNombre||'tu jefe directo')+'.',
       'Autorizada'   :'Ya está autorizada; falta que Administración la complete.',
-      'Rechazada'    :'Fue devuelta. Corrige y vuelve a enviarla a autorización.',
+      'Devuelta'     :'Fue devuelta. Corrige y vuelve a enviarla a autorización.',
+      'Rechazada'    :'Fue rechazada y no continúa.',
     }[etapa()] || '';
     toast('El PDF se libera cuando la solicitud queda cerrada. '+donde,'inf',6500);
     return;
@@ -4401,6 +4468,8 @@ function navEstado(f){
   const p = (f.parentReference && f.parentReference.path) || NAV.pila.map(x=>x.name).join('/');
   if(/\/Completas(\/|$)/i.test(p)  || /(^|\/)Completas$/i.test(p))  return 'Completa';
   if(/\/Pendientes(\/|$)/i.test(p) || /(^|\/)Pendientes$/i.test(p)) return 'Pendiente';
+  if(/(^|\/)Devueltas(\/|$)/i.test(p))  return 'Devuelta';
+  if(/(^|\/)Rechazadas(\/|$)/i.test(p)) return 'Rechazada';
   return '';
 }
 
@@ -4549,8 +4618,10 @@ function leerEnlace(){
   const m = String(location.hash||'').match(
     new RegExp('[#&]'+ENLACE_CLAVE+'=([^&/]+)/([^&]+)'));
   if(!m) return null;
+  const ac = String(location.hash||'').match(/[#&]accion=(devolver|rechazar)\b/);
   try{
-    return { drive:decodeURIComponent(m[1]), item:decodeURIComponent(m[2]) };
+    return { drive:decodeURIComponent(m[1]), item:decodeURIComponent(m[2]),
+             accion: ac ? ac[1] : '' };
   }catch(e){ return null; }      // fragmento mal formado
 }
 
@@ -4579,6 +4650,8 @@ async function abrirDesdeEnlace(ref, forzarLogin){
     if(aviso) aviso.classList.remove('on');
     limpiarEnlace();
     toast('Solicitud abierta · '+S.folio+(m.estado?' · '+m.estado:''), 'ok', 4500);
+    // Botón Devolver / Rechazar del correo: se pide el motivo de inmediato
+    if(ref.accion) setTimeout(()=> decidirSolicitud(ref.accion), 500);
   }catch(e){
     if(e && e.silencioso){
       poner('Inicia sesión con tu cuenta de Sipnology para abrir la solicitud.', true);
@@ -4700,12 +4773,14 @@ const POR_AUTORIZAR = 'Por autorizar';
 const PENDIENTES    = 'Pendientes';
 const COMPLETAS     = 'Completas';
 const RECHAZADAS    = 'Rechazadas';
+const DEVUELTAS     = 'Devueltas';
 
 const CARPETA_DE = {
   'Por autorizar': POR_AUTORIZAR,
   'Autorizada'   : PENDIENTES,
   'Completa'     : COMPLETAS,
   'Rechazada'    : RECHAZADAS,
+  'Devuelta'     : DEVUELTAS,
 };
 
 function etapa(){
@@ -4848,7 +4923,8 @@ async function enviarAviso(H, liga){
       </table>
       ${liga.portal ? `<p style="margin:18px 0 6px"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
-         border-radius:8px;display:inline-block;font-weight:600">Abrir en el portal</a></p>
+         border-radius:8px;display:inline-block;font-weight:600">${S.fmt.sinJefe ? 'Revisar y autorizar' : 'Abrir en el portal'}</a></p>
+      ${S.fmt.sinJefe ? botonesDecision(liga.portal) : ''}
       <p style="margin:0;font-size:12px;color:#888">Se abre lista para completar.
          ${liga.archivo ? `<a href="${esc(liga.archivo)}" style="color:#888">Ver el archivo en SharePoint</a>` : ''}</p>` : ''}
       <p style="margin:22px 0 0;font-size:12px;color:#888">
@@ -5102,37 +5178,99 @@ async function autorizarSolicitud(){
   }, $('#btnAutorizar'), 'Autorizando…');
 }
 
-function rechazarSolicitud(){
-  // En la Carta Responsiva quien autoriza —y por tanto quien devuelve— es Administración
-  const puede = S.fmt.sinJefe ? esAdmin() : esJefe();
-  if(!puede && S.fmt.sinJefe){
+/* Botones Devolver / Rechazar del correo. Llevan la acción en la liga:
+   el portal abre la solicitud y enseguida pide el motivo. */
+function botonesDecision(portal){
+  if(!portal) return '';
+  const b = (accion, txt, color) => `<a href="${esc(portal+'&accion='+accion)}"
+     style="background:#fff;color:${color};text-decoration:none;padding:9px 16px;margin:0 8px 0 0;
+     border:1.5px solid ${color};border-radius:8px;display:inline-block;font-weight:600">${txt}</a>`;
+  return `<p style="margin:10px 0 8px">${b('devolver','Devolver al solicitante','#B45309')}${b('rechazar','Rechazar','#B91C1C')}</p>`;
+}
+
+/* ── Devolver o rechazar ───────────────────────────────────────────
+   Devolver: vuelve al solicitante para que la ajuste y la reenvíe.
+   Rechazar: es definitivo; la solicitud ya no continúa.
+   Las dos piden el motivo, porque sin él el solicitante no sabe qué
+   corregir ni por qué se le negó.                                     */
+const DECISION = {
+  devolver:{ estado:'Devuelta', tit:'Devolver al solicitante', ok:'Devolver',
+    txt:'La solicitud regresa al solicitante. Indica qué debe ajustar: lo verá en el '+
+        'correo y al abrirla, y podrá volver a enviarla a autorización.' },
+  rechazar:{ estado:'Rechazada', tit:'Rechazar solicitud', ok:'Rechazar',
+    txt:'El rechazo es definitivo: la solicitud ya no podrá reenviarse. Indica el '+
+        'motivo; el solicitante lo recibirá por correo.' },
+};
+
+/* Quién decide en esta etapa: el jefe directo, o Administración en los
+   formatos sin jefe (Carta Responsiva). */
+function etapaDeDecision(){ return S.fmt.sinJefe ? 'Autorizada' : 'Por autorizar'; }
+function puedeDecidir(){ return S.fmt.sinJefe ? esAdmin() : esJefe(); }
+
+function pedirMotivo(tipo){
+  const D = DECISION[tipo];
+  return new Promise(res=>{
+    const ov = $('#ovMotivo'), campo = $('#motCampo');
+    $('#motTit').textContent = D.tit;
+    $('#motTxt').textContent = D.txt;
+    $('#motOk').textContent  = D.ok;
+    campo.value = '';
+    ov.classList.add('on');
+    setTimeout(()=>campo.focus(), 60);
+    const cerrar = v => { ov.classList.remove('on'); $('#motOk').onclick = $('#motCancelar').onclick = null; res(v); };
+    $('#motCancelar').onclick = ()=> cerrar(null);
+    $('#motOk').onclick = ()=>{
+      const m = String(campo.value||'').trim();
+      if(!m){ toast('Escribe el motivo: sin él, el solicitante no sabe qué hacer.','err',5000); campo.focus(); return; }
+      cerrar(m);
+    };
+  });
+}
+
+async function decidirSolicitud(tipo){
+  const D = DECISION[tipo];
+  if(!S.fmt || !D) return;
+  if(!puedeDecidir()){
     const c = cuentaActiva();
-    toast(`Esta solicitud solo la puede devolver Administración. Entraste como ${c?c.username:'—'}.`,'err',7000);
-    return;
-  }
-  if(!puede){
-    const c = cuentaActiva();
-    toast(`Esta solicitud solo la puede rechazar ${S.datos.jefeCorreo||'el jefe directo'}. `+
+    const quien = S.fmt.sinJefe ? 'Administración' : (S.datos.jefeCorreo || 'el jefe directo');
+    toast(`Esta solicitud solo la puede ${tipo==='devolver'?'devolver':'rechazar'} ${quien}. `+
           `Entraste como ${c?c.username:'—'}.`,'err',7000);
     return;
   }
-  const motivo = prompt('Motivo del rechazo (lo verá el solicitante):','');
-  if(motivo===null) return;
-  if(!String(motivo).trim()){
-    toast('Escribe el motivo: sin él, el solicitante no sabe qué corregir.','err',5000);
+  if(etapa() !== etapaDeDecision()){
+    toast(`Esta solicitud ya no está pendiente de autorización (estado: ${etapa()}).`,'inf',6000);
     return;
   }
-  conRepositorio(async ()=>{
-    const r = await guardarEnEtapa('Rechazada', {
-      rechazadaPor : (cuentaActiva()||{}).username || '',
-      rechazadaEn  : new Date().toISOString(),
-      motivoRechazo: String(motivo).trim(),
-    }, {yaValidado:true});
+  const motivo = await pedirMotivo(tipo);
+  if(motivo === null) return;
+
+  await conRepositorio(async ()=>{
+    const cuenta = cuentaActiva() || {};
+    const extra = {
+      decididaPor  : cuenta.username || '',
+      decididaPorNombre: cuenta.name || '',
+      decididaEn   : new Date().toISOString(),
+      motivoRechazo: motivo,           // se conserva el nombre por compatibilidad
+      rechazoFinal : tipo === 'rechazar' ? 1 : 0,
+    };
+    const r = await guardarEnEtapa(D.estado, extra, {yaValidado:true});
     if(!r) return;
-    try{ await correoRechazo(r.H, ligas(r.drive, r.subido), String(motivo).trim()); }
+    try{ await correoDecision(r.H, ligas(r.drive, r.subido), motivo, tipo); }
     catch(err){ console.error(err); }
-    toast('Solicitud rechazada. Se avisó al solicitante con el motivo.','ok',6000);
-  }, $('#btnRechazar'), 'Enviando…');
+    toast(tipo === 'devolver'
+      ? 'Solicitud devuelta. El solicitante recibió el motivo para ajustarla.'
+      : 'Solicitud rechazada. Se avisó al solicitante con el motivo.','ok',6000);
+  }, $(tipo==='devolver' ? '#btnDevolver' : '#btnRechazar'), 'Enviando…');
+}
+function devolverSolicitud(){ return decidirSolicitud('devolver'); }
+function rechazarSolicitud(){ return decidirSolicitud('rechazar'); }
+
+/* ¿Puede el solicitante volver a enviarla? Sí si está en borrador o se
+   la devolvieron. Las rechazadas antes de existir "Devolver" se
+   comportaban como devueltas, así que se respetan igual. */
+function reenviable(){
+  const e = etapa(), m = S.datos.__meta || {};
+  return e === 'Borrador' || e === 'Devuelta' || (e === 'Rechazada' && !m.rechazoFinal);
 }
 
 /* ── Correo al jefe directo ────────────────────────────────────────── */
@@ -5159,9 +5297,9 @@ async function correoAutorizacion(H, liga){
       ${liga.portal ? `<p style="margin:20px 0 6px"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:11px 20px;
          border-radius:8px;display:inline-block;font-weight:600">Revisar y autorizar</a></p>
-      <p style="margin:0;font-size:12px;color:#888">Se abre en el portal con la solicitud
-         completa, incluido el desglose. Ahí encontrarás los botones para autorizar o
-         rechazar.</p>` : ''}
+      ${botonesDecision(liga.portal)}
+      <p style="margin:0;font-size:12px;color:#888">Cada botón abre la solicitud completa en el
+         portal. Devolver y Rechazar te piden el motivo antes de confirmar.</p>` : ''}
       <p style="margin:22px 0 0;font-size:12px;color:#888">
          Enviado automáticamente por el Portal de Formatos de Sipnology
          ${cuenta ? '· '+esc(cuenta.username||'') : ''}</p>
@@ -5180,20 +5318,26 @@ async function correoAutorizacion(H, liga){
 }
 
 /* ── Correo de rechazo al solicitante ──────────────────────────────── */
-async function correoRechazo(H, liga, motivo){
+async function correoDecision(H, liga, motivo, tipo){
+  const devuelta = tipo !== 'rechazar';
+  const quien = S.fmt.sinJefe ? 'el área de Administración'
+                              : esc(S.datos.jefeNombre || 'tu jefe directo');
   liga = liga || {};
   const para = correoDelSolicitante();
   if(!para) return;
   const cuerpo = `
     <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
-      <p style="margin:0 0 14px">Tu solicitud <b>${esc(S.folio)}</b> fue devuelta por
-         ${S.fmt.sinJefe ? 'el área de Administración'
-                         : esc(S.datos.jefeNombre || 'tu jefe directo')}.</p>
+      <p style="margin:0 0 14px">Tu solicitud <b>${esc(S.folio)}</b> ${devuelta
+         ? `fue devuelta por ${quien} para que hagas ajustes.`
+         : `fue <b>rechazada</b> por ${quien}.`}</p>
       <p style="margin:0 0 14px;padding:12px 14px;background:#FDF0EC;
          border-left:3px solid #C0392B"><b>Motivo:</b> ${esc(motivo)}</p>
       ${liga.portal ? `<p style="margin:18px 0 0"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
-         border-radius:8px;display:inline-block;font-weight:600">Abrir y corregir</a></p>` : ''}
+         border-radius:8px;display:inline-block;font-weight:600">${devuelta ? 'Abrir y corregir' : 'Ver solicitud'}</a></p>
+      <p style="margin:6px 0 0;font-size:12px;color:#888">${devuelta
+         ? 'Haz los ajustes indicados y vuelve a enviarla a autorización desde el portal.'
+         : 'El rechazo es definitivo. Si todavía la necesitas, levanta una solicitud nueva.'}</p>` : ''}
       <p style="margin:22px 0 0;font-size:12px;color:#888">
          Enviado automáticamente por el Portal de Formatos de Sipnology</p>
     </div>`;
@@ -5201,7 +5345,7 @@ async function correoRechazo(H, liga, motivo){
     method:'POST',
     headers:Object.assign({}, H, {'Content-Type':'application/json'}),
     body:JSON.stringify({message:{
-      subject:`Solicitud ${S.folio} devuelta`,
+      subject: tipo === 'rechazar' ? `Solicitud ${S.folio} rechazada` : `Solicitud ${S.folio} devuelta para ajustes`,
       body:{contentType:'HTML', content:cuerpo},
       toRecipients:[{emailAddress:{address:para}}],
     }, saveToSentItems:true}),
@@ -5242,17 +5386,41 @@ function resumenCorreo(){
   const d = S.datos, id = S.fmt.id;
   const lista = v => Array.isArray(v) ? v.filter(Boolean).join(', ') : (v||'');
   const rango = (a,b) => [fDate(a), fDate(b)].filter(Boolean).join(' al ');
+  /* Monto: lo que se pide y, una vez que el jefe autoriza, lo autorizado */
+  const mon = m => /^USD/.test(String(m||'')) ? 'USD' : 'MXN';
+  const din = (n, m) => (parseFloat(n) > 0) ? `${fMoney(n)} ${mon(m)}` : '';
+  const autorizada = ['Autorizada','Completa'].includes((d.__meta||{}).estado);
+  const etiqueta = autorizada ? 'Monto solicitado y autorizado' : 'Monto solicitado';
   switch(id){
-    case 'viaticos': return { frase:'para el siguiente viaje', filas:[
-      ['Cliente', d.cliente], ['Fechas', rango(d.del, d.al)], ['Propósito del viaje', d.motivo]]};
+    case 'viaticos': {
+      const anticipo = d.modalidad === 'Anticipo' ? totalGastos().mxn : 0;
+      return { frase:'para el siguiente viaje', filas:[
+        ['Cliente', d.cliente], ['Fechas', rango(d.del, d.al)], ['Propósito del viaje', d.motivo],
+        ['Modalidad', d.modalidad],
+        [etiqueta + (d.modalidad === 'Anticipo' ? ' (anticipo)' : ''),
+         d.modalidad === 'Reembolso' ? 'Reembolso: sin depósito previo' : din(anticipo)],
+        ['Hospedaje', d.hospedaje === 'Sí' ? 'Sí, lo gestiona Administración' : (d.hospedaje || '')]]};
+    }
     case 'vacaciones': return { frase:'para el siguiente período de vacaciones', filas:[
       ['Período', rango(d.vacDel, d.vacAl)], ['Días autorizados', d.diasAutorizados],
       ['Reincorporación', fDate(d.reincorporacion)]]};
-    case 'capacitacion': return { frase:'para la siguiente capacitación', filas:[
-      ['Formación', lista(d.formacion)], ['Curso', d.cursoNombre], ['Examen', d.examenNombre],
-      ['Material', d.matTitulo]]};
-    case 'licencia': return { frase:'para la siguiente licencia', filas:[
-      ['Aplicativo', d.app], ['Fabricante', d.fabricante], ['N.° de licencias', d.numLic]]};
+    case 'capacitacion': {
+      const f = Array.isArray(d.formacion) ? d.formacion : [];
+      const partes = [
+        f.includes('Curso') && din(d.cursoCosto, d.cursoMoneda) ? 'Curso '+din(d.cursoCosto, d.cursoMoneda) : '',
+        f.includes('Examen de Certificación') && din(d.examenCosto, d.examenMoneda) ? 'Examen '+din(d.examenCosto, d.examenMoneda) : '',
+        f.includes('Material / Libro') && din(d.matCosto, d.matMoneda) ? 'Material '+din(d.matCosto, d.matMoneda) : '',
+      ].filter(Boolean);
+      return { frase:'para la siguiente capacitación', filas:[
+        ['Formación', lista(d.formacion)], ['Curso', d.cursoNombre], ['Examen', d.examenNombre],
+        ['Material', d.matTitulo], [etiqueta, partes.join(' · ')]]};
+    }
+    case 'licencia': {
+      const tot = (parseFloat(limpiaNum(d.numLic))||0) * (parseFloat(limpiaNum(d.costoUni))||0);
+      return { frase:'para la siguiente licencia', filas:[
+        ['Aplicativo', d.app], ['Fabricante', d.fabricante], ['N.° de licencias', d.numLic],
+        [etiqueta, din(tot, d.moneda)]]};
+    }
     case 'responsiva': return { frase:'para la siguiente asignación de equipo', filas:[
       ['Equipo', lista(d.tipoEquipo)], ['Tipo de asignación', d.tipoAsignacion],
       ['Fecha de asignación', fDate(d.fecha)]]};
@@ -5871,6 +6039,7 @@ function init(){
   $('#btnEnviar').onclick    = enviarAutorizacion;
   $('#btnAutorizar').onclick = autorizarSolicitud;
   $('#btnRechazar').onclick  = rechazarSolicitud;
+  $('#btnDevolver').onclick  = devolverSolicitud;
   // Navegación dentro del repositorio
   $('#navAtras').onclick     = navAtras;
   $('#navAdelante').onclick  = navAdelante;
