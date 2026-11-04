@@ -4886,6 +4886,18 @@ function ligas(drive, subido){
 /* ── Aviso por correo ──────────────────────────────────────────────
    Sale a nombre de quien entrega la solicitud, con los datos que
    Administración necesita para ubicarla sin abrir el archivo.      */
+/* Lista de copias válida y sin repetir a quien ya va en "Para" */
+function copias(para, lista){
+  const ya = new Set([].concat(para).map(a=>String(a||'').trim().toLowerCase()));
+  const out = [];
+  lista.forEach(a=>{
+    const x = String(a||'').trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x) || ya.has(x.toLowerCase())) return;
+    ya.add(x.toLowerCase()); out.push(x);
+  });
+  return out;
+}
+
 /* Copia al jefe directo, salvo que ya venga entre los destinatarios */
 function copiaJefe(para){
   const j = String((S.datos||{}).jefeCorreo||'').trim();
@@ -4994,6 +5006,10 @@ async function enviarCierre(H, liga, pdfB64, nombrePdf){
     subject: `Solicitud ${S.folio} completada · ${S.fmt.corto}`,
     body: {contentType:'HTML', content:cuerpo},
     toRecipients: [{emailAddress:{address:para}}],
+    /* Copia al jefe directo y a Administración: todos quedan enterados
+       del cierre con el mismo PDF definitivo. */
+    ccRecipients: copias(para, [S.fmt.sinJefe ? '' : S.datos.jefeCorreo, ...getAvisos(S.fmt.id)])
+                    .map(a=>({emailAddress:{address:a}})),
   };
   if(pdfB64) mensaje.attachments = [{
     '@odata.type':'#microsoft.graph.fileAttachment',
@@ -5360,6 +5376,9 @@ async function correoDecision(H, liga, motivo, tipo){
       subject: tipo === 'rechazar' ? `Solicitud ${S.folio} rechazada` : `Solicitud ${S.folio} devuelta para ajustes`,
       body:{contentType:'HTML', content:cuerpo},
       toRecipients:[{emailAddress:{address:para}}],
+      // Copia al jefe directo, para que sepa que se devolvió o rechazó y por qué
+      ccRecipients: copias(para, [S.fmt.sinJefe ? '' : S.datos.jefeCorreo])
+                      .map(x=>({emailAddress:{address:x}})),
     }, saveToSentItems:true}),
   });
   if(!r.ok) throw new Error('rechazo HTTP '+r.status);
