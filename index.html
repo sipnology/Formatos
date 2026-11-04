@@ -5282,11 +5282,15 @@ async function decidirSolicitud(tipo){
     };
     const r = await guardarEnEtapa(D.estado, extra, {yaValidado:true});
     if(!r) return;
-    try{ await correoDecision(r.H, ligas(r.drive, r.subido), motivo, tipo); }
-    catch(err){ console.error(err); }
-    toast(tipo === 'devolver'
-      ? 'Solicitud devuelta. El solicitante recibió el motivo para ajustarla.'
-      : 'Solicitud rechazada. Se avisó al solicitante con el motivo.','ok',6000);
+    let envio;
+    try{ envio = await correoDecision(r.H, ligas(r.drive, r.subido), motivo, tipo); }
+    catch(err){ console.error(err); envio = { enviado:false, motivo:'falló el envío ('+(err.message||err)+')' }; }
+    const hecho = tipo === 'devolver' ? 'Solicitud devuelta' : 'Solicitud rechazada';
+    /* Se dice la verdad sobre el correo: si no salió, quien decidió debe
+       avisar por otro medio, o el solicitante nunca se entera. */
+    if(envio && envio.enviado) toast(`${hecho}. Se envió el motivo a ${envio.para}.`,'ok',6500);
+    else toast(`${hecho}, pero NO se pudo enviar el correo al solicitante: `+
+               `${(envio&&envio.motivo)||'motivo desconocido'}. Avísale por otro medio.`,'err',9000);
   }, $(tipo==='devolver' ? '#btnDevolver' : '#btnRechazar'), 'Enviando…');
 }
 function devolverSolicitud(){ return decidirSolicitud('devolver'); }
@@ -5352,7 +5356,7 @@ async function correoDecision(H, liga, motivo, tipo){
     ? 'el área de Administración' : esc(S.datos.jefeNombre || 'tu jefe directo');
   liga = liga || {};
   const para = correoDelSolicitante();
-  if(!para) return;
+  if(!para) return { enviado:false, motivo:'no se conoce el correo del solicitante' };
   const cuerpo = `
     <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a">
       <p style="margin:0 0 14px">Tu solicitud <b>${esc(S.folio)}</b> ${devuelta
@@ -5382,6 +5386,7 @@ async function correoDecision(H, liga, motivo, tipo){
     }, saveToSentItems:true}),
   });
   if(!r.ok) throw new Error('rechazo HTTP '+r.status);
+  return { enviado:true, para };
 }
 
 /* ── Entrar en modo Administración ── */
@@ -6121,6 +6126,32 @@ function init(){
   }
 }
 document.addEventListener('DOMContentLoaded', init);
+
+/* ── ¿Hay una versión más nueva publicada? ─────────────────────────
+   El navegador puede seguir usando una copia vieja del portal aunque ya
+   se haya subido otra. Se compara la marca de esta copia con la del
+   sitio publicado y, si difieren, se ofrece recargar.               */
+const VERSION_PORTAL = '8725110afe';
+async function revisarVersion(){
+  if(location.protocol === 'file:') return;
+  try{
+    const r = await fetch(location.pathname + '?v=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const m = (await r.text()).match(/const VERSION_PORTAL = '([^']+)'/);
+    if(!m || m[1] === VERSION_PORTAL) return;
+    const b = document.createElement('div');
+    b.style.cssText = 'position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:200;'+
+      'background:var(--or);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;'+
+      'box-shadow:var(--sh-2);display:flex;gap:12px;align-items:center';
+    b.innerHTML = 'Hay una versión nueva del portal. '+
+      '<button style="background:#fff;color:var(--or-d);border-radius:7px;padding:5px 12px;'+
+      'font-weight:700">Actualizar</button>';
+    b.querySelector('button').onclick = ()=> location.reload();
+    document.body.appendChild(b);
+  }catch(e){ /* sin red: se sigue con la copia actual */ }
+}
+window.addEventListener('load', ()=> setTimeout(revisarVersion, 1500));
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) revisarVersion(); });
 
 
 </script>
