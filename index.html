@@ -207,7 +207,7 @@ table.rt tr:last-child td{border-bottom:none}
 table.rt input{width:100%;border:1px solid transparent;background:transparent;padding:6px 7px;
   border-radius:6px;font-size:12.5px;outline:none;transition:.12s}
 table.rt input:hover{background:var(--bg)}
-table.rt input:focus{background:#fff;border-color:var(--or);box-shadow:0 0 0 2.5px rgba(224,92,20,.1)}
+table.rt input:focus{background:var(--panel);color:var(--ink);border-color:var(--or);box-shadow:0 0 0 2.5px rgba(224,92,20,.1)}
 table.rt input.num{text-align:right;font-variant-numeric:tabular-nums}
 table.rt td.cal{text-align:right;font-variant-numeric:tabular-nums;font-weight:590;
   color:var(--ink-2);padding-right:12px;white-space:nowrap}
@@ -1337,7 +1337,10 @@ viaticos:{
               'y comprueba después. En ambos casos el transporte y el hospedaje los '+
               'paga Administración directamente.'},
 
-        {k:'gastos', tipo:'tabla', w:12,
+        /* Con Anticipo debe haber algo que depositar: al menos un concepto
+           con días (o importe, en los de monto libre). */
+        {k:'gastos', tipo:'tabla', w:12, minUnaFila:1,
+         l:'Desglose del anticipo',
          cond:{k:'modalidad', igual:'Anticipo'},
          cols:[
            {k:'concepto', l:'Concepto',   tipo:'fijo',  ancho:'20%'},
@@ -2672,10 +2675,10 @@ function sincronizarBotones(){
   ver('#btnAutorizar', dos && e==='Por autorizar' && jefe);
   /* Sin jefe directo, Administración es quien autoriza o devuelve */
   const sinJefe = !!S.fmt.sinJefe;
-  const decide = dos && ((e==='Por autorizar' && jefe) ||
-                         (sinJefe && admin && e==='Autorizada'));
-  ver('#btnRechazar',  decide);
-  ver('#btnDevolver',  decide);
+  const decideJefe  = dos && e==='Por autorizar' && jefe && !sinJefe;
+  const decideAdmin = dos && admin && e==='Autorizada';
+  ver('#btnDevolver',  decideJefe || decideAdmin);
+  ver('#btnRechazar',  decideJefe || (decideAdmin && sinJefe));
   const tEnv = $('#btnEnviarTxt');
   if(tEnv) tEnv.textContent = sinJefe ? 'Enviar a Administración' : 'Enviar a Autorización';
   /* Administración entra a capturar una vez que está autorizada */
@@ -5202,10 +5205,18 @@ const DECISION = {
         'motivo; el solicitante lo recibirá por correo.' },
 };
 
-/* Quién decide en esta etapa: el jefe directo, o Administración en los
-   formatos sin jefe (Carta Responsiva). */
-function etapaDeDecision(){ return S.fmt.sinJefe ? 'Autorizada' : 'Por autorizar'; }
-function puedeDecidir(){ return S.fmt.sinJefe ? esAdmin() : esJefe(); }
+/* Quién puede decidir y en qué etapa:
+   · El jefe directo, mientras está por autorizar: devolver o rechazar.
+   · Administración, ya autorizada: devolver al solicitante si faltan
+     datos (por ejemplo, los días del anticipo). En la Carta Responsiva,
+     donde Administración es quien autoriza, también puede rechazar. */
+function rolDecision(tipo){
+  const e = etapa();
+  if(!S.fmt.sinJefe && e === 'Por autorizar' && esJefe()) return 'jefe';
+  if(e === 'Autorizada' && esAdmin() && (tipo === 'devolver' || S.fmt.sinJefe)) return 'admin';
+  return '';
+}
+function puedeDecidir(tipo){ return !!rolDecision(tipo); }
 
 function pedirMotivo(tipo){
   const D = DECISION[tipo];
@@ -5230,15 +5241,14 @@ function pedirMotivo(tipo){
 async function decidirSolicitud(tipo){
   const D = DECISION[tipo];
   if(!S.fmt || !D) return;
-  if(!puedeDecidir()){
-    const c = cuentaActiva();
-    const quien = S.fmt.sinJefe ? 'Administración' : (S.datos.jefeCorreo || 'el jefe directo');
-    toast(`Esta solicitud solo la puede ${tipo==='devolver'?'devolver':'rechazar'} ${quien}. `+
-          `Entraste como ${c?c.username:'—'}.`,'err',7000);
-    return;
-  }
-  if(etapa() !== etapaDeDecision()){
-    toast(`Esta solicitud ya no está pendiente de autorización (estado: ${etapa()}).`,'inf',6000);
+  const rol = rolDecision(tipo);
+  if(!rol){
+    const c = cuentaActiva(), e = etapa();
+    const pendiente = (e === 'Por autorizar' || e === 'Autorizada');
+    toast(!pendiente
+      ? `Esta solicitud ya no está pendiente (estado: ${e}).`
+      : `No puedes ${tipo==='devolver'?'devolver':'rechazar'} esta solicitud en esta etapa. `+
+        `Entraste como ${c?c.username:'—'}.`,'err',7000);
     return;
   }
   const motivo = await pedirMotivo(tipo);
@@ -5248,6 +5258,7 @@ async function decidirSolicitud(tipo){
     const cuenta = cuentaActiva() || {};
     const extra = {
       decididaPor  : cuenta.username || '',
+      decididaRol  : rol,
       decididaPorNombre: cuenta.name || '',
       decididaEn   : new Date().toISOString(),
       motivoRechazo: motivo,           // se conserva el nombre por compatibilidad
@@ -5320,8 +5331,9 @@ async function correoAutorizacion(H, liga){
 /* ── Correo de rechazo al solicitante ──────────────────────────────── */
 async function correoDecision(H, liga, motivo, tipo){
   const devuelta = tipo !== 'rechazar';
-  const quien = S.fmt.sinJefe ? 'el área de Administración'
-                              : esc(S.datos.jefeNombre || 'tu jefe directo');
+  const m = S.datos.__meta || {};
+  const quien = (S.fmt.sinJefe || m.decididaRol === 'admin')
+    ? 'el área de Administración' : esc(S.datos.jefeNombre || 'tu jefe directo');
   liga = liga || {};
   const para = correoDelSolicitante();
   if(!para) return;
@@ -5583,6 +5595,16 @@ function validar(){
     if(c.req && !tieneValor(S.datos[c.k])){
       faltan.push(c.l);
       if(primera<0) primera=o.i;
+    }
+    /* Una tabla de desglose vacía no es un anticipo: se exige al menos
+       un concepto con días o importe. */
+    if(c.tipo==='tabla' && c.minUnaFila){
+      const datos = S.datos[c.k] || {};
+      const hay = c.filas.some((fila,i)=> totalFila(fila, datos[i]).mxn > 0);
+      if(!hay){
+        faltan.push('Anticipo · captura los días de al menos un concepto');
+        if(primera<0) primera=o.i;
+      }
     }
     /* Los tramos agregados también tienen obligatorios propios — el número
        de confirmación del hotel, por ejemplo. Sin esto, un viaje con tres
