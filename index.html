@@ -1722,6 +1722,69 @@ responsiva:{
   ]
 },
 
+/* ─────────────── 5b. CARTA RESPONSIVA DE EQUIPO DE SEGURIDAD ───────────────
+   Mismo flujo que la Carta Responsiva de Equipo: son activos de la
+   empresa, el colaborador la envía y solo Administración autoriza. */
+seguridad:{
+  compacto:1,
+  id:'seguridad', pre:'CRS',
+  nombre:'Carta Responsiva de Equipo de Seguridad',
+  corto:'Equipo de Seguridad',
+  archivo:'Carta Responsiva Equipo Seguridad',
+  desc:'Entrega de casco, lentes, chaleco, botas y demás equipo de protección personal.',
+  color:'#C2410C', colorBg:'#FFF1E7',
+  icono:'<path d="M3 18h18"/><path d="M5 18v-3a7 7 0 0114 0v3"/><path d="M12 8V5"/><path d="M9 6h6"/>',
+  version:'01', emision:'NOVIEMBRE/2026', paginas:'1 de 1',
+  subeRepo:1, dosEtapas:1, adminSiempre:1, sinJefe:1,
+  /* Como en el formato en papel: entrega Administración, recibe el colaborador */
+  firmas:{ banner:'FIRMAS DE CONFORMIDAD', altoFirma:40,
+           autoriza:['ENTREGA\n(Administración)','RECIBE\n(Colaborador)'],
+           pies:(d, m) => FIRMAS_ADMIN.pies(d, m).reverse() },
+  acceso:['fernando.fernandez@sipnology.com.mx',
+          'sahira.bermudez@sipnology.com.mx',
+          'miriam.gutierrez@sipnology.com.mx',
+          'leonardo.montes@sipnology.com.mx'],
+  notaLegal:'RESPONSABILIDADES DEL COLABORADOR: • Utilizar el equipo exclusivamente para las '+
+    'actividades laborales y conforme a las indicaciones de seguridad. • Conservarlo en buen estado '+
+    'y darle el uso adecuado. • No prestarlo, transferirlo ni modificarlo sin autorización. '+
+    '• Reportar oportunamente cualquier daño, pérdida o mal funcionamiento. • Devolverlo cuando sea '+
+    'solicitado por la empresa o al concluir la relación laboral, según corresponda. '+
+    'Declaro que recibo el equipo descrito y que conozco las responsabilidades de uso, cuidado y '+
+    'resguardo indicadas en este documento.',
+  secciones:[
+    { t:'Datos del Colaborador', d:'A quién se le entrega el equipo',
+      campos:[
+        {k:'solicitante', l:'Nombre del Colaborador', tipo:'text', w:12, req:1},
+        {k:'area',        l:'Área o Departamento',    tipo:'sel',  w:6, req:1, op:DEPTOS},
+        {k:'puesto',      l:'Puesto',                 tipo:'text', w:6, req:1},
+        {k:'fecha',       l:'Fecha de Entrega',       tipo:'date', w:6, req:1, hoy:1},
+        {k:'ciudad',      l:'Ciudad',                 tipo:'text', w:6, ph:'Guadalajara, Jal.'},
+      ]},
+    { t:'Equipo de Seguridad', d:'Captura la cantidad de cada equipo entregado',
+      banner:'EQUIPO DE SEGURIDAD ENTREGADO',
+      campos:[
+        {tipo:'nota', l:'Por medio de la presente, hago constar que recibo de SIPNOLOGY SA DE CV '+
+          'el equipo de seguridad que se detalla a continuación, en condiciones adecuadas para su uso.'},
+        /* Los cuatro equipos del formato en papel, siempre impresos. Basta
+           con capturar la cantidad de los que sí se entregan. */
+        {k:'eqSeg', l:'Equipo de seguridad', tipo:'lista', w:12, minUnaFila:'cant',
+         fijas:['Casco de seguridad','Lentes de seguridad','Chaleco de seguridad','Botas de seguridad'],
+         colFija:'Equipo de seguridad', pie:'Equipos del formato',
+         cols:[{k:'cant',   l:'Cantidad',          tipo:'entero'},
+               {k:'estado', l:'Estado al recibir', tipo:'sel', op:['Nuevo','Buen estado','Usado']},
+               {k:'obs',    l:'Observaciones'}]},
+        {k:'segExtra', tipo:'bloques', w:12, comoTabla:1,
+         titulo:'Equipo Adicional', btn:'Agregar otro equipo',
+         campos:[
+           {k:'equipo', l:'Equipo de seguridad', tipo:'text', w:6},
+           {k:'cant',   l:'Cantidad',            tipo:'entero', w:6},
+           {k:'estado', l:'Estado al recibir',   tipo:'sel', w:6, op:['Nuevo','Buen estado','Usado']},
+           {k:'obs',    l:'Observaciones',       tipo:'text', w:6},
+         ]},
+      ]},
+  ]
+},
+
 /* ───────────────────────── 6. VACACIONES ─────────────────────────
    Sustituye al formato de Excel. La tabla de días por antigüedad que
    traía era la anterior a la reforma de Vacaciones Dignas (6 días el
@@ -2457,7 +2520,7 @@ function filaAuto(c){
 }
 
 function listaHTML(c){
-  const n = Math.max(0, Math.min(30, parseInt(S.datos[c.n])||0));
+  const n = c.fijas ? c.fijas.length : Math.max(0, Math.min(30, parseInt(S.datos[c.n])||0));
   const datos = S.datos[c.k] || {};
   if(!n) return '';
   const auto = filaAuto(c);
@@ -2471,12 +2534,24 @@ function listaHTML(c){
         return `<td><input type="text" value="${esc(rv[col.k]||'')}" readonly tabindex="-1"
           style="background:var(--bg);color:var(--ink-2);cursor:default;font-weight:550"
           title="Se toma de los datos del solicitante"></td>`;
+      const marca = `data-lk="${c.k}" data-li="${i}" data-lc="${col.k}"`;
+      if(col.tipo==='sel')
+        return `<td><select ${marca} style="width:100%;background:transparent;color:var(--ink);
+          border:1px solid var(--line);border-radius:6px;padding:5px 6px">
+          <option value="">—</option>${col.op.map(o=>
+            `<option${rv[col.k]===o?' selected':''}>${esc(o)}</option>`).join('')}</select></td>`;
+      if(col.tipo==='entero')
+        return `<td style="width:90px"><input class="num" type="text" inputmode="numeric" data-entero="1"
+          ${marca} value="${esc(rv[col.k]||'')}" placeholder="0"></td>`;
       // Columnas con tipo propio: fecha, hora o texto
       const tp = col.tipo==='date' ? 'date' : col.tipo==='time' ? 'time' : 'text';
       const ph = tp==='text' ? ` placeholder="${esc(col.ph||col.l)}"` : '';
-      return `<td><input type="${tp}" data-lk="${c.k}" data-li="${i}" data-lc="${col.k}"
+      return `<td><input type="${tp}" ${marca}
         value="${esc(rv[col.k]||'')}"${ph}></td>`;
     }).join('');
+    // Filas fijas: el nombre del equipo va antes de las columnas capturables
+    if(c.fijas) return `<tr><td class="lbl" style="width:38px;text-align:center;padding-left:0;
+      color:var(--ink-3);font-size:11.5px">${i+1}</td><td class="lbl">${esc(c.fijas[i])}</td>${tds}</tr>`;
     const etiq = bloqueada
       ? `<span style="color:var(--or);font-weight:650">1</span>`
       : (i+1);
@@ -2494,7 +2569,8 @@ function listaHTML(c){
   return `<div class="fld w12"><label>${esc(c.l)}</label>
     <div class="tbl-wrap" style="grid-column:auto">
       <div class="tbl-sc"><table class="rt" style="min-width:${minW}px">
-        <thead><tr><th style="width:38px;text-align:center">#</th>${th}</tr></thead>
+        <thead><tr><th style="width:38px;text-align:center">#</th>${c.fijas
+          ? `<th>${esc(c.colFija||'Concepto')}</th>` : ''}${th}</tr></thead>
         <tbody>${rows}</tbody></table></div>
       <div class="tbl-tot" style="font-size:11.5px;font-weight:550">
         ${pie}<b style="font-size:13px">${n}</b></div>
@@ -3162,14 +3238,14 @@ function firmasCarta(d){
 }
 
 function bloqueLista(c){
-  const n = Math.max(0, Math.min(30, parseInt(S.datos[c.n])||0));
+  const n = c.fijas ? c.fijas.length : Math.max(0, Math.min(30, parseInt(S.datos[c.n])||0));
   if(!n) return null;
   const datos = S.datos[c.k] || {};
   const auto  = (typeof filaAuto==='function') ? filaAuto(c) : null;
   const filas = Array.from({length:n}, (_,i)=>{
     // La fila 1 se toma de los datos del solicitante
     const rv = (auto && i===0) ? auto : (datos[i] || {});
-    return [String(i+1), ...c.cols.map(col=>{
+    return [String(i+1), ...(c.fijas ? [c.fijas[i]] : []), ...c.cols.map(col=>{
       const v = rv[col.k] || '';
       if(!v) return '';
       if(col.tipo==='date') return fDate(v);
@@ -3177,7 +3253,9 @@ function bloqueLista(c){
       return v;
     })];
   });
-  return {t:'lista', titulo:c.l, heads:['#', ...c.cols.map(col=>col.l)], filas};
+  return {t:'lista', titulo:c.l,
+          heads:[c.fijas ? 'No.' : '#', ...(c.fijas ? [c.colFija||'Concepto'] : []), ...c.cols.map(col=>col.l)],
+          filas};
 }
 
 function bloqueTabla(c){
@@ -4245,6 +4323,7 @@ const CARPETAS = {
   /* Ahora pasa por autorización: el jefe la abre desde su liga, así que
      necesita carpeta propia en SharePoint. */
   responsiva   : 'Carta Responsiva',
+  seguridad    : 'Carta Responsiva Seguridad',
 };
 
 let _msalApp = null;
@@ -5457,6 +5536,14 @@ function resumenCorreo(){
         ['Aplicativo', d.app], ['Fabricante', d.fabricante], ['N.° de licencias', d.numLic],
         [etiqueta, din(tot, d.moneda)]]};
     }
+    case 'seguridad': {
+      const f = (S.fmt.secciones[1].campos.find(c=>c.k==='eqSeg')||{}).fijas || [];
+      const eq = f.map((n,i)=>{ const v=(d.eqSeg||{})[i]||{}; return (parseInt(v.cant)||0)>0 ? `${n} (${v.cant})` : ''; })
+        .concat((d.segExtra||[]).map(v=> v && (parseInt(v.cant)||0)>0 ? `${v.equipo||'Otro'} (${v.cant})` : ''))
+        .filter(Boolean);
+      return { frase:'para la siguiente entrega de equipo de seguridad', filas:[
+        ['Equipo', eq.join(', ')], ['Fecha de entrega', fDate(d.fecha)]]};
+    }
     case 'responsiva': return { frase:'para la siguiente asignación de equipo', filas:[
       ['Equipo', lista(d.tipoEquipo)], ['Tipo de asignación', d.tipoAsignacion],
       ['Fecha de asignación', fDate(d.fecha)]]};
@@ -5619,6 +5706,17 @@ function validar(){
     if(c.req && !tieneValor(S.datos[c.k])){
       faltan.push(c.l);
       if(primera<0) primera=o.i;
+    }
+    /* Lista de filas fijas: al menos una con cantidad (o con la columna
+       indicada), o en los bloques adicionales. */
+    if(c.tipo==='lista' && c.minUnaFila){
+      const datos = S.datos[c.k] || {};
+      const extra = (S.datos.segExtra||[]).some(rv=> (parseInt((rv||{}).cant)||0) > 0);
+      const hay = (c.fijas||[]).some((_,i)=> (parseInt((datos[i]||{})[c.minUnaFila])||0) > 0);
+      if(!hay && !extra){
+        faltan.push(`${c.l} · captura la cantidad de al menos un equipo`);
+        if(primera<0) primera=o.i;
+      }
     }
     /* Una tabla de desglose vacía no es un anticipo: se exige al menos
        un concepto con días o importe. */
@@ -6131,7 +6229,7 @@ document.addEventListener('DOMContentLoaded', init);
    El navegador puede seguir usando una copia vieja del portal aunque ya
    se haya subido otra. Se compara la marca de esta copia con la del
    sitio publicado y, si difieren, se ofrece recargar.               */
-const VERSION_PORTAL = '8725110afe';
+const VERSION_PORTAL = '1f32962afb';
 async function revisarVersion(){
   if(location.protocol === 'file:') return;
   try{
