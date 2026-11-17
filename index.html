@@ -1805,6 +1805,9 @@ vacaciones:{
   version:'01', emision:'JULIO/2026', paginas:'1 de 1',
   // Mismo flujo que Viáticos: el jefe autoriza y Administración da el Vo. Bo.
   subeRepo:1, dosEtapas:1, adminSiempre:1,
+  /* Sahira no forma parte de la cadena de autorización de vacaciones:
+     no recibe los avisos ni puede completarlas. */
+  adminsExcluir:['sahira.bermudez@sipnology.com.mx'],
   /* Documento denso: se aprieta la tipografía para que quepa en una hoja
      sin sacrificar ningún dato. Nada se omite, todo se compacta. */
   compacto:1,
@@ -4847,7 +4850,10 @@ const RESPONSABLES_ADMIN = [
   'miriam.gutierrez@sipnology.com.mx',
   'sahira.bermudez@sipnology.com.mx',
 ];
-const AVISOS_DEFAULT = {};
+const AVISOS_DEFAULT = {
+  // Vacaciones las lleva solo Miriam: Sahira no recibe estos avisos
+  vacaciones : ['miriam.gutierrez@sipnology.com.mx'],
+};
 
 /* ── Etapas del expediente ─────────────────────────────────────────
    Borrador → Por autorizar → Autorizada → Completa
@@ -4911,6 +4917,9 @@ function esAdmin(){
   const c = cuentaActiva();
   if(!c) return false;
   const correo = String(c.username || '').trim().toLowerCase();
+  // Formatos donde alguien de Administración no participa
+  const fuera = ((S.fmt && S.fmt.adminsExcluir) || []).map(a => a.toLowerCase());
+  if(fuera.includes(correo)) return false;
   return getAdmins().some(a => String(a).trim().toLowerCase() === correo);
 }
 
@@ -6249,7 +6258,7 @@ document.addEventListener('DOMContentLoaded', init);
    El navegador puede seguir usando una copia vieja del portal aunque ya
    se haya subido otra. Se compara la marca de esta copia con la del
    sitio publicado y, si difieren, se ofrece recargar.               */
-const VERSION_PORTAL = 'e4cf9221c5';
+const VERSION_PORTAL = '3d04439bd0';
 async function revisarVersion(){
   if(location.protocol === 'file:') return;
   try{
