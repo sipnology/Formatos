@@ -504,6 +504,7 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
   </div>
   <div class="tb-spacer"></div>
   <div class="tb-actions">
+    <span id="tbCuenta" style="font-size:12px;color:var(--ink-3);margin-right:6px;white-space:nowrap"></span>
     <button class="btn btn-g btn-sm" data-import title="Cargar una solicitud guardada">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
@@ -696,6 +697,12 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
     <span id="btnEnviarTxt">Enviar a Autorización</span></button>
+  <button class="btn btn-p" id="btnAvisar" style="display:none"
+          title="El aviso al solicitante no salió: envíalo ahora">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h16v16H4z"/><path d="M4 6l8 7 8-7"/></svg>
+    Enviar aviso al solicitante</button>
   <button class="btn btn-s" id="btnDevolver" style="display:none"
           title="Regresarla al solicitante para que haga ajustes y la vuelva a enviar">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -804,14 +811,36 @@ table.rt td.dsc{color:var(--ink-3);font-size:11.5px;line-height:1.4;max-width:27
   </div>
 </div>
 
+<!-- ══════════════ INICIO DE SESIÓN OBLIGATORIO ══════════════ -->
+<div class="ov ov-fijo" id="ovSesion" style="background:rgba(10,15,30,.86)">
+  <div class="modal" style="text-align:center;max-width:420px">
+    <div style="font-size:22px;font-weight:800;color:var(--or);letter-spacing:.6px;margin-bottom:6px">
+      SIPNOLOGY <span style="color:var(--line);font-weight:400">|</span> FORMATOS</div>
+    <h3 style="margin:10px 0 6px">Inicia sesión para continuar</h3>
+    <p>Usa tu cuenta de Microsoft de Sipnology. Así cada solicitud queda registrada a tu
+       nombre y te llegan los avisos de autorización.</p>
+    <p id="sesErr" style="color:var(--err);font-size:13px;min-height:18px;margin:6px 0 0"></p>
+    <div class="modal-a" style="justify-content:center">
+      <button class="btn btn-p" id="sesBtn">Iniciar sesión con Microsoft</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ MOTIVO DE DEVOLUCIÓN O RECHAZO ══════════════ -->
-<div class="ov" id="ovMotivo">
+<div class="ov ov-fijo" id="ovMotivo">
   <div class="modal">
     <h3 id="motTit">Devolver al solicitante</h3>
     <p id="motTxt"></p>
     <textarea id="motCampo" rows="4" style="width:100%;margin:4px 0 14px;padding:10px 12px;
       border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
       font:inherit;resize:vertical" placeholder="Escribe el motivo…"></textarea>
+    <div id="motCorreoWrap" style="display:none;margin:-4px 0 14px">
+      <label style="display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:5px">
+        Correo del solicitante — esta solicitud no lo tiene registrado</label>
+      <input id="motCorreo" type="email" placeholder="nombre.apellido@sipnology.com.mx"
+        style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);
+        background:var(--panel);color:var(--ink);font:inherit">
+    </div>
     <div class="modal-a">
       <button class="btn btn-s" id="motCancelar">Cancelar</button>
       <button class="btn btn-p" id="motOk">Devolver</button>
@@ -2760,6 +2789,7 @@ function sincronizarBotones(){
   const decideJefe  = dos && e==='Por autorizar' && jefe && !sinJefe;
   const decideAdmin = dos && admin && e==='Autorizada';
   ver('#btnDevolver',  decideJefe || decideAdmin);
+  ver('#btnAvisar',    dos && typeof avisoPendiente==='function' && avisoPendiente());
   ver('#btnRechazar',  decideJefe || (decideAdmin && sinJefe));
   const tEnv = $('#btnEnviarTxt');
   if(tEnv) tEnv.textContent = sinJefe ? 'Enviar a Administración' : 'Enviar a Autorización';
@@ -5138,6 +5168,18 @@ async function guardarEnEtapa(nuevoEstado, extra, opts){
 
   const token = await graphToken(cfg);
   const H = {Authorization:'Bearer '+token};
+
+  /* Quién hizo cada paso se toma DESPUÉS de iniciar sesión. Antes se leía
+     al armar los datos, y si era la primera acción de la sesión todavía
+     no había cuenta: la solicitud quedaba sin el correo de quien la envió
+     y luego nadie podía avisarle de una devolución. */
+  const cuenta = cuentaActiva() || {};
+  extra = Object.assign({}, extra || {});
+  Object.keys(extra).forEach(k=>{
+    if(/Por$/.test(k) && !extra[k])        extra[k] = cuenta.username || '';
+    if(/PorNombre$/.test(k) && !extra[k])  extra[k] = cuenta.name || '';
+  });
+
   const drive = await graphDrive(cfg, H);
 
   const carpeta = rutaCarpeta(S.fmt.id, nuevoEstado);
@@ -5325,22 +5367,40 @@ function rolDecision(tipo){
 }
 function puedeDecidir(tipo){ return !!rolDecision(tipo); }
 
-function pedirMotivo(tipo){
+const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/* Ventana del motivo. Si la solicitud no tiene el correo del solicitante
+   (las enviadas antes de corregir el registro), también lo pide: sin él
+   el aviso no puede salir. Con soloCorreo se usa para reenviar el aviso
+   de una decisión ya tomada, con el motivo original a la vista. */
+function pedirMotivo(tipo, opts){
+  opts = opts || {};
   const D = DECISION[tipo];
+  const falta = !correoDelSolicitante();
   return new Promise(res=>{
-    const ov = $('#ovMotivo'), campo = $('#motCampo');
-    $('#motTit').textContent = D.tit;
-    $('#motTxt').textContent = D.txt;
-    $('#motOk').textContent  = D.ok;
-    campo.value = '';
+    const ov = $('#ovMotivo'), campo = $('#motCampo'), wrap = $('#motCorreoWrap'), mail = $('#motCorreo');
+    $('#motTit').textContent = opts.soloCorreo ? 'Enviar el aviso al solicitante' : D.tit;
+    $('#motTxt').textContent = opts.soloCorreo
+      ? 'El correo de esta '+(tipo==='devolver'?'devolución':'decisión')+' no salió. Indica el correo del solicitante para enviárselo con el motivo registrado.'
+      : D.txt;
+    $('#motOk').textContent  = opts.soloCorreo ? 'Enviar aviso' : D.ok;
+    campo.value = opts.motivo || '';
+    campo.readOnly = !!opts.soloCorreo;
+    wrap.style.display = (falta || opts.soloCorreo) ? '' : 'none';
+    mail.value = correoDelSolicitante();
     ov.classList.add('on');
-    setTimeout(()=>campo.focus(), 60);
-    const cerrar = v => { ov.classList.remove('on'); $('#motOk').onclick = $('#motCancelar').onclick = null; res(v); };
+    setTimeout(()=> (opts.soloCorreo ? mail : campo).focus(), 60);
+    const cerrar = v => { ov.classList.remove('on'); campo.readOnly = false;
+      $('#motOk').onclick = $('#motCancelar').onclick = null; res(v); };
     $('#motCancelar').onclick = ()=> cerrar(null);
     $('#motOk').onclick = ()=>{
       const m = String(campo.value||'').trim();
       if(!m){ toast('Escribe el motivo: sin él, el solicitante no sabe qué hacer.','err',5000); campo.focus(); return; }
-      cerrar(m);
+      const c = String(mail.value||'').trim();
+      if(wrap.style.display !== 'none' && !ES_CORREO.test(c)){
+        toast('Escribe el correo del solicitante: sin él no le llega el aviso.','err',5000); mail.focus(); return;
+      }
+      cerrar({motivo:m, correo:c});
     };
   });
 }
@@ -5358,8 +5418,9 @@ async function decidirSolicitud(tipo){
         `Entraste como ${c?c.username:'—'}.`,'err',7000);
     return;
   }
-  const motivo = await pedirMotivo(tipo);
-  if(motivo === null) return;
+  const resp = await pedirMotivo(tipo);
+  if(resp === null) return;
+  const motivo = resp.motivo;
 
   await conRepositorio(async ()=>{
     const cuenta = cuentaActiva() || {};
@@ -5371,6 +5432,8 @@ async function decidirSolicitud(tipo){
       motivoRechazo: motivo,           // se conserva el nombre por compatibilidad
       rechazoFinal : tipo === 'rechazar' ? 1 : 0,
     };
+    // Correo capturado en la ventana: se guarda como el de quien la envió
+    if(resp.correo && !correoDelSolicitante()) extra.entregadaPor = resp.correo;
     const r = await guardarEnEtapa(D.estado, extra, {yaValidado:true});
     if(!r) return;
     let envio;
@@ -5379,12 +5442,41 @@ async function decidirSolicitud(tipo){
     const hecho = tipo === 'devolver' ? 'Solicitud devuelta' : 'Solicitud rechazada';
     /* Se dice la verdad sobre el correo: si no salió, quien decidió debe
        avisar por otro medio, o el solicitante nunca se entera. */
-    if(envio && envio.enviado) toast(`${hecho}. Se envió el motivo a ${envio.para}.`,'ok',6500);
+    if(envio && envio.enviado){
+      S.datos.__meta.avisoEnviado = 1;
+      try{ await guardarEnEtapa(D.estado, {avisoEnviado:1}, {yaValidado:true}); }catch(e){}
+      toast(`${hecho}. Se envió el motivo a ${envio.para}.`,'ok',6500);
+    }
     else toast(`${hecho}, pero NO se pudo enviar el correo al solicitante: `+
                `${(envio&&envio.motivo)||'motivo desconocido'}. Avísale por otro medio.`,'err',9000);
   }, $(tipo==='devolver' ? '#btnDevolver' : '#btnRechazar'), 'Enviando…');
 }
 function devolverSolicitud(){ return decidirSolicitud('devolver'); }
+
+/* ¿Quedó pendiente avisarle al solicitante? Aplica a quien decidió (jefe o
+   Administración) mientras la solicitud siga devuelta o rechazada. */
+function avisoPendiente(){
+  const e = etapa(), m = S.datos.__meta || {};
+  if(!(e === 'Devuelta' || (e === 'Rechazada' && m.rechazoFinal))) return false;
+  if(m.avisoEnviado || !m.motivoRechazo) return false;
+  return esAdmin() || esJefe();
+}
+async function reenviarAvisoDecision(){
+  const m = S.datos.__meta || {};
+  const tipo = m.rechazoFinal ? 'rechazar' : 'devolver';
+  const resp = await pedirMotivo(tipo, {soloCorreo:true, motivo:m.motivoRechazo});
+  if(resp === null) return;
+  await conRepositorio(async ()=>{
+    if(resp.correo) S.datos.__meta.entregadaPor = resp.correo;
+    const r = await guardarEnEtapa(etapa(), {entregadaPor: resp.correo || m.entregadaPor}, {yaValidado:true});
+    if(!r) return;
+    const envio = await correoDecision(r.H, ligas(r.drive, r.subido), m.motivoRechazo, tipo);
+    if(envio && envio.enviado){
+      await guardarEnEtapa(etapa(), {avisoEnviado:1}, {yaValidado:true});
+      toast('Aviso enviado a '+envio.para+'.','ok',6500);
+    }else toast('No se pudo enviar: '+((envio&&envio.motivo)||'motivo desconocido'),'err',8000);
+  }, $('#btnAvisar'), 'Enviando…');
+}
 function rechazarSolicitud(){ return decidirSolicitud('rechazar'); }
 
 /* ¿Puede el solicitante volver a enviarla? Sí si está en borrador o se
@@ -6213,6 +6305,7 @@ function init(){
   $('#btnAutorizar').onclick = autorizarSolicitud;
   $('#btnRechazar').onclick  = rechazarSolicitud;
   $('#btnDevolver').onclick  = devolverSolicitud;
+  $('#btnAvisar').onclick    = reenviarAvisoDecision;
   // Navegación dentro del repositorio
   $('#navAtras').onclick     = navAtras;
   $('#navAdelante').onclick  = navAdelante;
@@ -6225,14 +6318,14 @@ function init(){
   $$('[data-cerrar]').forEach(b=>
     b.onclick = ()=> $('#'+b.dataset.cerrar).classList.remove('on'));
   $$('.ov').forEach(ov=>
-    ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('on'); }));
+    ov.addEventListener('click', e=>{ if(e.target===ov && !ov.classList.contains('ov-fijo')) ov.classList.remove('on'); }));
 
   new ResizeObserver(pedirZoom).observe($('.pv-scroll'));
 
   document.addEventListener('keydown', e=>{
     if((e.ctrlKey||e.metaKey) && e.key==='s'){ e.preventDefault();
       if(S.fmt) descargarPDF(); }
-    if(e.key==='Escape') $$('.ov').forEach(o=>o.classList.remove('on'));
+    if(e.key==='Escape') $$('.ov:not(.ov-fijo)').forEach(o=>o.classList.remove('on'));
   });
 
   if(!pdfListo()){
@@ -6244,13 +6337,57 @@ function init(){
   /* Si se llegó desde la liga del correo, la solicitud se abre sola.
      Va al final para que todo el portal ya esté armado. */
   const ref = (typeof leerEnlace==='function') ? leerEnlace() : null;
-  if(ref){
+  exigirSesion().then(()=>{
+    if(!ref) return;
     $('#ligaCerrar').onclick = ()=>{
       $('#ligaAviso').classList.remove('on'); limpiarEnlace(); irInicio();
     };
     $('#ligaBtn').onclick = ()=> abrirDesdeEnlace(ref, true);
     abrirDesdeEnlace(ref, false);
-  }
+  });
+}
+
+/* ── Inicio de sesión al entrar ────────────────────────────────────
+   Nadie trabaja en el portal sin sesión: así cada solicitud lleva el
+   correo de quien la envía desde el primer momento. Si ya hay una sesión
+   guardada se entra directo; si no, se pide con un botón, porque la
+   ventana de Microsoft necesita el clic del usuario para abrirse.
+   Abierto desde el disco (file:) no hay inicio de sesión posible: se
+   deja pasar, como copia de prueba.                                   */
+function mostrarCuenta(){
+  const c = cuentaActiva(), el = $('#tbCuenta');
+  if(el) el.textContent = c ? (c.name || c.username || '') : '';
+  if(el && c) el.title = c.username || '';
+}
+async function exigirSesion(){
+  if(location.protocol === 'file:') return true;
+  const gate = $('#ovSesion');
+  try{
+    await graphToken(getGraphCfg(), {soloSilencioso:true});
+    mostrarCuenta();
+    return true;
+  }catch(e){ /* sin sesión guardada: se pide */ }
+
+  gate.classList.add('on');
+  return new Promise(res=>{
+    $('#sesBtn').onclick = async ()=>{
+      const b = $('#sesBtn'), err = $('#sesErr');
+      err.textContent = ''; b.disabled = true; b.textContent = 'Abriendo Microsoft…';
+      try{
+        await graphToken(getGraphCfg());
+        gate.classList.remove('on');
+        mostrarCuenta();
+        renderHome();
+        res(true);
+      }catch(e){
+        err.textContent = /popup|cancel|interaction/i.test(e.message||'')
+          ? 'Se cerró la ventana de Microsoft o el navegador la bloqueó. Vuelve a intentarlo.'
+          : 'No se pudo iniciar sesión: ' + (e.message || e);
+      }finally{
+        b.disabled = false; b.textContent = 'Iniciar sesión con Microsoft';
+      }
+    };
+  });
 }
 document.addEventListener('DOMContentLoaded', init);
 
@@ -6258,7 +6395,7 @@ document.addEventListener('DOMContentLoaded', init);
    El navegador puede seguir usando una copia vieja del portal aunque ya
    se haya subido otra. Se compara la marca de esta copia con la del
    sitio publicado y, si difieren, se ofrece recargar.               */
-const VERSION_PORTAL = '3d04439bd0';
+const VERSION_PORTAL = '22e8d2cd8d';
 async function revisarVersion(){
   if(location.protocol === 'file:') return;
   try{
