@@ -2042,9 +2042,22 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 
 function fDate(v){
   if(!v) return '';
+  /* Momentos con hora (cuándo se envió, autorizó o completó) se guardan
+     en UTC. Recortarlos daba el día siguiente a partir de las 6 pm. */
+  if(/T\d\d:/.test(String(v))){
+    const x = new Date(v);
+    if(!isNaN(x)) return `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}/${x.getFullYear()}`;
+  }
   const p = String(v).split('-');
   if(p.length!==3) return v;
   return `${p[2]}/${p[1]}/${p[0]}`;
+}
+/* Fecha de la solicitud. Los formatos que no la capturan (Viáticos) usan
+   el día en que se envió; antes caían en el inicio del viaje. */
+function fechaSolicitud(d){
+  d = d || S.datos || {};
+  const m = d.__meta || {};
+  return d.fecha || m.entregadaEn || hoyISO();
 }
 function fDateLong(v){
   if(!v) return '';
@@ -2906,7 +2919,7 @@ function opcionesLista(c){
 /* Pie de firma: nombre arriba, fecha abajo. Sin dato queda la línea
    para llenarse a mano, como en el formato impreso. */
 function piesFirma(p){
-  const f = p.fecha ? fDate(String(p.fecha).slice(0,10)) : '';
+  const f = p.fecha ? fDate(p.fecha) : '';
   return {nombre: String(p.nombre||'').trim().toUpperCase(), fecha: f};
 }
 function buildDoc(){
@@ -2922,7 +2935,7 @@ function buildDoc(){
   const salto = ()=>{ pie(); B.push({t:'break'}); };
 
   B.push({t:'header', titulo:f.nombre.toUpperCase(), folio:S.folio,
-          fecha:fDate(d.fecha || d.del || hoyISO())});
+          fecha:fDate(fechaSolicitud(d))});
 
   seccionesDoc().forEach(o=>{
     const sec = o.s;
@@ -5052,10 +5065,10 @@ async function enviarAviso(H, liga){
         ${fila('Tipo de solicitud', S.fmt.nombre)}
         ${fila('Solicitante', d.solicitante || '—')}
         ${fila('No. de solicitud', S.folio)}
-        ${fila('Fecha de solicitud', fDate(d.fecha || d.del || hoyISO()))}
+        ${fila('Fecha de solicitud', fDate(fechaSolicitud(d)))}
         ${detalle}
         ${fila('Autorizada por', autorizo ? `${autorizo}${m.autorizadaPor ? ' · '+m.autorizadaPor : ''}` : '')}
-        ${fila('Fecha de autorización', m.autorizadaEn ? fDate(String(m.autorizadaEn).slice(0,10)) : '')}
+        ${fila('Fecha de autorización', m.autorizadaEn ? fDate(m.autorizadaEn) : '')}
       </table>
       ${liga.portal ? `<p style="margin:18px 0 6px"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
@@ -5096,6 +5109,23 @@ function correoDelSolicitante(){
     .find(c => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) || '';
 }
 
+/* Montos definitivos que Administración dejó capturados. Solo los que
+   tienen valor, para que el correo diga exactamente lo que se deposita. */
+function montosFinales(){
+  if(!S.fmt || S.fmt.id !== 'viaticos') return [];
+  const porClave = {};
+  S.fmt.secciones.forEach(s=>s.campos.forEach(c=>{ if(c.k) porClave[c.k]=c; }));
+  const v = k => porClave[k] ? valorCalculado(porClave[k]) : 0;
+  const din = n => n > 0 ? fMoney(n)+' MXN' : '';
+  return [
+    ['Anticipo', din(v('subAnticipo'))],
+    ['Hospedaje a pagar en sitio', din(v('subHospDeposito'))],
+    ['Total a depositar al colaborador', din(v('totalDeposito')), 1],
+    ['Hospedaje pagado por Sipnology', din(v('subHospedaje'))],
+    ['Transporte pagado por Sipnology', din(v('subTransporte'))],
+  ].filter(r => r[1]);
+}
+
 async function enviarCierre(H, liga, pdfB64, nombrePdf){
   liga = liga || {};
   const para = correoDelSolicitante();
@@ -5112,9 +5142,11 @@ async function enviarCierre(H, liga, pdfB64, nombrePdf){
         <tr><td style="padding:4px 14px 4px 0;color:#666">No. de solicitud</td>
             <td style="padding:4px 0"><b>${esc(S.folio)}</b></td></tr>
         <tr><td style="padding:4px 14px 4px 0;color:#666">Fecha</td>
-            <td style="padding:4px 0"><b>${esc(fDate(d.fecha || d.del || hoyISO()))}</b></td></tr>
+            <td style="padding:4px 0"><b>${esc(fDate(fechaSolicitud(d)))}</b></td></tr>
         <tr><td style="padding:4px 14px 4px 0;color:#666">Estado</td>
             <td style="padding:4px 0"><b style="color:#0F7A47">Completada</b></td></tr>
+        ${montosFinales().map(([l,v,fuerte])=>`<tr><td style="padding:4px 14px 4px 0;color:#666">${esc(l)}</td>
+            <td style="padding:4px 0"><b${fuerte?' style="color:#E05C14"':''}>${esc(v)}</b></td></tr>`).join('')}
       </table>
       ${liga.portal ? `<p style="margin:18px 0 0"><a href="${esc(liga.portal)}"
          style="background:#E05C14;color:#fff;text-decoration:none;padding:10px 18px;
@@ -5616,9 +5648,11 @@ function resumenCorreo(){
       return { frase:'para el siguiente viaje', filas:[
         ['Cliente', d.cliente], ['Fechas', rango(d.del, d.al)], ['Propósito del viaje', d.motivo],
         ['Modalidad', d.modalidad],
-        [etiqueta + (d.modalidad === 'Anticipo' ? ' (anticipo)' : ''),
+        [(d.modalidad === 'Anticipo' ? 'Anticipo ' + etiqueta.replace(/^Monto /,'') : etiqueta),
          d.modalidad === 'Reembolso' ? 'Reembolso: sin depósito previo' : din(anticipo)],
-        ['Hospedaje', d.hospedaje === 'Sí' ? 'Sí, lo gestiona Administración' : (d.hospedaje || '')]]};
+        ['Hospedaje', d.hospedaje === 'Sí'
+          ? 'Sí · Administración define si se paga o se reserva; si se reserva, su monto se suma al depósito'
+          : (d.hospedaje || '')]]};
     }
     case 'vacaciones': return { frase:'para el siguiente período de vacaciones', filas:[
       ['Período', rango(d.vacDel, d.vacAl)], ['Días autorizados', d.diasAutorizados],
@@ -6395,7 +6429,7 @@ document.addEventListener('DOMContentLoaded', init);
    El navegador puede seguir usando una copia vieja del portal aunque ya
    se haya subido otra. Se compara la marca de esta copia con la del
    sitio publicado y, si difieren, se ofrece recargar.               */
-const VERSION_PORTAL = '22e8d2cd8d';
+const VERSION_PORTAL = 'a59d453a35';
 async function revisarVersion(){
   if(location.protocol === 'file:') return;
   try{
