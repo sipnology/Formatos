@@ -1181,6 +1181,11 @@ viaticos:{
         {k:'transporteOtro', l:'Otro — Especifique', tipo:'text', w:12},
 
         /* ═══ Solo si se marcó AVIÓN ═══ */
+        /* La aerolínea la pide para emitir el boleto (lo solicitó Administración) */
+        {tipo:'sub', l:'Datos del Pasajero', cond:{k:'transporte', tiene:'Avión'}},
+        {k:'fechaNacimiento', l:'Fecha de Nacimiento del Solicitante', tipo:'date', w:6, req:1,
+         cond:{k:'transporte', tiene:'Avión'},
+         hint:'La aerolínea la requiere para emitir el boleto.'},
         {tipo:'sub', l:'Vuelo de Ida', cond:{k:'transporte', tiene:'Avión'}},
         {k:'vi_aerolinea',l:'Aerolínea',    tipo:'text', w:4, cond:{k:'transporte', tiene:'Avión'}},
         {k:'vi_numero',   l:'No. de Vuelo', tipo:'text', w:4, cond:{k:'transporte', tiene:'Avión'}},
@@ -6429,7 +6434,7 @@ document.addEventListener('DOMContentLoaded', init);
    El navegador puede seguir usando una copia vieja del portal aunque ya
    se haya subido otra. Se compara la marca de esta copia con la del
    sitio publicado y, si difieren, se ofrece recargar.               */
-const VERSION_PORTAL = 'a59d453a35';
+const VERSION_PORTAL = '82bd24a296';
 async function revisarVersion(){
   if(location.protocol === 'file:') return;
   try{
