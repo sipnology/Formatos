@@ -209,6 +209,12 @@ table.rt input{width:100%;border:1px solid transparent;background:transparent;pa
 table.rt input:hover{background:var(--bg)}
 table.rt input:focus{background:var(--panel);color:var(--ink);border-color:var(--or);box-shadow:0 0 0 2.5px rgba(224,92,20,.1)}
 table.rt input.num{text-align:right;font-variant-numeric:tabular-nums}
+/* Las casillas capturables de la tabla se distinguen a simple vista: borde
+   y fondo propios, y la de días con acento naranja porque es obligatoria. */
+table.rt input[data-tk]{border-color:var(--line);background:var(--panel)}
+table.rt input[data-tc="dias"]{border:1.5px solid var(--or);background:rgba(232,99,42,.10);
+  color:var(--ink);font-weight:650;text-align:center}
+table.rt input[data-tc="dias"]::placeholder{color:var(--or);opacity:.75}
 table.rt td.cal{text-align:right;font-variant-numeric:tabular-nums;font-weight:590;
   color:var(--ink-2);padding-right:12px;white-space:nowrap}
 table.rt td.lbl{font-weight:590;color:var(--ink);padding-left:12px}
@@ -1126,6 +1132,9 @@ viaticos:{
   // Dos etapas: el solicitante entrega y Administración completa después
   // Jefe directo autoriza; Administración siempre da el visto bueno
   subeRepo:1, dosEtapas:1, adminSiempre:1,
+  /* Administración revisa montos y datos del viaje: si algo no procede,
+     puede rechazarla aunque el jefe ya la haya autorizado. */
+  adminRechaza:1,
   firmas:FIRMAS_FLUJO,
   notaLegal:'COMPROMISO: Quien suscribe se hace responsable de comprobar la totalidad de los '+
     'recursos recibidos mediante comprobantes fiscales (CFDI) o recibos de gastos autorizados, '+
@@ -1383,7 +1392,7 @@ viaticos:{
            {k:'concepto', l:'Concepto',   tipo:'fijo',  ancho:'20%'},
            {k:'desc',     l:'Descripción del gasto', tipo:'fijo', ancho:'38%', clase:'dsc'},
            {k:'tarifa',   l:'Tarifa MXN', tipo:'money', ancho:'15%'},
-           {k:'dias',     l:'Días',       tipo:'num',   ancho:'11%'},
+           {k:'dias',     l:'Días',       tipo:'num',   ancho:'11%', req:1},
            {k:'mxn',      l:'Total MXN',  tipo:'calc',  ancho:'16%'},
          ],
          filas:[
@@ -2526,7 +2535,7 @@ function tablaHTML(c){
   const datos = S.datos[c.k] || {};
   const th = c.cols.map(col=>
     `<th class="${['money','num','calc'].includes(col.tipo)?'num':''}"
-      style="width:${col.ancho||'auto'}">${esc(col.l)}</th>`).join('');
+      style="width:${col.ancho||'auto'}">${esc(col.l)}${col.req?' <span style="color:var(--or)">*</span>':''}</th>`).join('');
 
   const rows = c.filas.map((fila,i)=>{
     const rv = datos[i] || {};
@@ -2808,7 +2817,7 @@ function sincronizarBotones(){
   const decideAdmin = dos && admin && e==='Autorizada';
   ver('#btnDevolver',  decideJefe || decideAdmin);
   ver('#btnAvisar',    dos && typeof avisoPendiente==='function' && avisoPendiente());
-  ver('#btnRechazar',  decideJefe || (decideAdmin && sinJefe));
+  ver('#btnRechazar',  decideJefe || (decideAdmin && (sinJefe || !!S.fmt.adminRechaza)));
   const tEnv = $('#btnEnviarTxt');
   if(tEnv) tEnv.textContent = sinJefe ? 'Enviar a Administración' : 'Enviar a Autorización';
   /* Administración entra a capturar una vez que está autorizada */
@@ -5399,7 +5408,7 @@ const DECISION = {
 function rolDecision(tipo){
   const e = etapa();
   if(!S.fmt.sinJefe && e === 'Por autorizar' && esJefe()) return 'jefe';
-  if(e === 'Autorizada' && esAdmin() && (tipo === 'devolver' || S.fmt.sinJefe)) return 'admin';
+  if(e === 'Autorizada' && esAdmin() && (tipo === 'devolver' || S.fmt.sinJefe || S.fmt.adminRechaza)) return 'admin';
   return '';
 }
 function puedeDecidir(tipo){ return !!rolDecision(tipo); }
@@ -5865,10 +5874,17 @@ function validar(){
        un concepto con días o importe. */
     if(c.tipo==='tabla' && c.minUnaFila){
       const datos = S.datos[c.k] || {};
-      const hay = c.filas.some((fila,i)=> totalFila(fila, datos[i]).mxn > 0);
-      if(!hay){
-        faltan.push('Anticipo · captura los días de al menos un concepto');
+      /* Con Anticipo se exigen los días: al menos un concepto con días
+         mayores a cero. Antes bastaba un importe libre (gasolina, casetas)
+         y la solicitud se iba con todos los días en 0. */
+      const conDias = c.filas.some((fila,i)=> (parseFloat(limpiaNum((datos[i]||{}).dias))||0) > 0);
+      if(!conDias){
+        faltan.push('Anticipo · captura los días (al menos en Alimentos o en el concepto que solicitas)');
         if(primera<0) primera=o.i;
+        $$('input[data-tk="'+c.k+'"][data-tc="dias"]').forEach(el=>{
+          el.style.borderColor='var(--err)'; el.style.boxShadow='0 0 0 3px rgba(198,40,40,.18)';
+          setTimeout(()=>{ el.style.borderColor=''; el.style.boxShadow=''; }, 3500);
+        });
       }
     }
     /* Los tramos agregados también tienen obligatorios propios — el número
@@ -6434,7 +6450,7 @@ document.addEventListener('DOMContentLoaded', init);
    El navegador puede seguir usando una copia vieja del portal aunque ya
    se haya subido otra. Se compara la marca de esta copia con la del
    sitio publicado y, si difieren, se ofrece recargar.               */
-const VERSION_PORTAL = '82bd24a296';
+const VERSION_PORTAL = 'b2e379a8ab';
 async function revisarVersion(){
   if(location.protocol === 'file:') return;
   try{
